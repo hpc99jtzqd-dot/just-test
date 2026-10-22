@@ -10,7 +10,10 @@
   color-scheme:light;
   --sky-top:#0d2fa8; --sky-mid:#1f56d6; --sky-low:#4d8ff0; --sky-rim:#c4e2ff;
   --grass:#6cbf42; --grass-deep:#2f7d22; --road:#eeb69c;
-  --ink:#10243f; --ink-soft:#3d5675; --on-sky:#ffffff; --on-sky-soft:#d6e6ff;
+  --ink:#10243f; --ink-soft:#31475f; --on-sky:#ffffff; --on-sky-soft:#eef5ff;
+  /* 흰 글자를 얹는 버튼·칩: 글자가 놓이는 가운데 띠가 4.5:1 이상 되게 깊게 깐다 */
+  --aqua-btn:linear-gradient(180deg,#1a8bbd 0%,#0a6a98 38%,#07567d 100%);
+  --leaf-btn:linear-gradient(180deg,#34901c 0%,#23700f 42%,#1c5c0c 100%);
   --glass-hi:rgba(255,255,255,.80); --glass-lo:rgba(225,242,255,.58); --glass-edge:rgba(255,255,255,.95);
   --glass-shine:rgba(255,255,255,.95); --shadow:rgba(10,40,110,.28);
   --aqua:#12a6d6; --aqua-deep:#0b6d9c; --leaf:#4fb22c; --leaf-hi:#a6ee6e;
@@ -58,7 +61,7 @@ h1{font-family:var(--f-game);font-weight:400;font-size:clamp(30px,3.7vw,54px);li
 .field input:focus-visible{outline:2px solid var(--aqua);outline-offset:2px}
 .field small{font-size:11px}
 .route{display:inline-flex;align-items:center;gap:8px;border-radius:999px;padding:5px 14px 5px 10px;font-size:14px;color:#fff;font-family:var(--f-game);
-  background:linear-gradient(180deg,#3cc3ec,var(--aqua-deep));box-shadow:inset 0 1px 0 rgba(255,255,255,.6),0 3px 10px var(--shadow);text-shadow:0 1px 1px rgba(0,0,0,.3)}
+  background:var(--aqua-btn);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),0 3px 10px var(--shadow);text-shadow:0 1px 1px rgba(0,0,0,.3)}
 .route[data-line="2"]{background:linear-gradient(180deg,#f4b84a,#b5700e)}
 .route[data-line="3"]{background:linear-gradient(180deg,#ff7a62,#b8301f)}
 .route svg{width:18px;height:18px}
@@ -70,7 +73,7 @@ h1{font-family:var(--f-game);font-weight:400;font-size:clamp(30px,3.7vw,54px);li
 .info::before{content:"";position:absolute;left:5%;right:5%;top:2px;height:42%;border-radius:22px 22px 60% 60%/22px 22px 24px 24px;
   background:linear-gradient(180deg,rgba(255,255,255,.9),transparent);pointer-events:none}
 .i-top{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;font-size:12.5px;color:var(--ink-soft);position:relative;font-variant-numeric:tabular-nums}
-.i-top .chip{font-size:11px;border-radius:999px;padding:2px 9px;color:#fff;background:linear-gradient(180deg,var(--leaf-hi),var(--leaf));text-shadow:0 1px 1px rgba(0,0,0,.25)}
+.i-top .chip{font-size:12px;border-radius:999px;padding:2px 9px;color:#fff;background:var(--leaf-btn);text-shadow:0 1px 1px rgba(0,0,0,.25)}
 .i-top .chip.off{background:none;color:var(--ink-soft);border:1px dashed var(--ink-soft);text-shadow:none}
 .i-name{font-family:var(--f-game);font-weight:400;font-size:30px;line-height:1.05;margin:0;position:relative}
 .i-todo{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:3px;position:relative}
@@ -79,16 +82,19 @@ h1{font-family:var(--f-game);font-weight:400;font-size:clamp(30px,3.7vw,54px);li
   background:radial-gradient(circle at 35% 30%,#fff 0 20%,var(--aqua) 60%,var(--aqua-deep))}
 .i-todo li.extra{color:var(--aqua-deep);font-weight:700}
 .go-in{align-self:flex-start;margin-top:4px;cursor:pointer;border:0;font-family:var(--f-game);font-size:16px;color:#fff;border-radius:999px;padding:9px 18px 8px;
-  background:linear-gradient(180deg,#5fd6f7 0%,var(--aqua) 50%,var(--aqua-deep) 100%);
+  background:var(--aqua-btn);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.8),inset 0 -2px 4px rgba(0,40,80,.3),0 4px 12px var(--shadow);text-shadow:0 1px 1px rgba(0,0,0,.3);
   transition:transform .16s cubic-bezier(.23,1,.32,1)}
 @media (hover:hover) and (pointer:fine){.go-in:hover{filter:brightness(1.06)}}
 .go-in:active{transform:scale(.97);transition-duration:.06s}
 .go-in:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
 .i-hint{margin:0;font-size:12px;color:var(--ink-soft);position:relative}
-.foot{font-size:12px;color:#e3f5d6;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:18px 28px;max-width:62em}
+.foot{font-size:12px;color:#f2fbec;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:18px 28px;max-width:62em}
 
 @media (min-width:900px){
+  /* 머리말 글자 뒤에만 옅은 남색 그늘: 지평선 쪽 밝은 하늘 위에서도 설명 글이 읽히게 */
+  .head::before{content:"";position:absolute;z-index:-1;left:0;top:0;right:-14%;bottom:-6%;pointer-events:none;
+    background:radial-gradient(ellipse 72% 68% at 28% 42%,rgba(9,32,120,.5),rgba(9,32,120,0) 72%)}
   .head{position:absolute;z-index:5;top:0;left:0;max-width:min(46%,560px);padding-block:clamp(20px,4vh,40px) 0;padding-left:max(28px,env(safe-area-inset-left,0px))}
   .info{position:absolute;z-index:5;top:clamp(20px,4vh,40px);right:max(24px,env(safe-area-inset-right,0px));width:310px;margin:0}
   .i-name{font-size:28px}

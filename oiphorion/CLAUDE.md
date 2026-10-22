@@ -35,6 +35,10 @@ tools/shot.js     Playwright + SwiftShader 렌더 스크린샷
 refs/             민이 준 레퍼런스 사진 2장, 현재 화면 캡처 2장
 ```
 
+## 외부 스킬
+
+저장소 루트 `.claude/skills/`에 22개가 있다(출처·라이선스: `.claude/THIRD_PARTY_SKILLS.md`). 오이포리온에 특히 쓸모 있는 것: `review-animations`, `improve-animations`, `animation-performance`(움직임), `ui-ux-pro-max`(대비·터치·타이포 검색: `python3 .claude/skills/ui-ux-pro-max/scripts/search.py "<질의>" --domain ux`).
+
 ## 명령
 
 ```bash
@@ -175,6 +179,9 @@ printf '7\n07:30\n화\n08:40\n0\n' | ./study_os  # 수업 날 계획 시험
 - 제목을 "오이포리온"으로 바꿨다(이전: 트램펄린을 멘 난쟁이). 땅을 모르고 날려다 떨어진 오이포리온 ↔ 땅을 딛고 튀는 난쟁이, 절벽의 "낙하 한도 ?????" 표지판.
 - 두루마리가 "너무 어둡다" → 밝은 은회색 종이, 옅은 하늘빛 막으로 바꾸고, 풍경 노출도 올렸다.
 - 프루티거 에어로 요소: 유리 패널, 반짝이는 버튼, 비눗방울. 드림코어 요소: 한낮의 달, 구름 위 하얀 문.
+- **v0.4 점검(외부 스킬 적용):**
+  - `review-animations` 기준: 걷기 0.35~1.4초 + 도중에 방향 바꾸면 지금 자리·속도에서 이어 감(`routeFrom`, `locate`), 두루마리 0.48초 서랍 곡선, 깊이 전환 0.2초, 버튼 누름 피드백, hover는 마우스 기기에서만.
+  - `ui-ux-pro-max` 기준(대비 4.5:1, 터치 24px·간격 8px): 흰 글자 버튼·칩은 `--aqua-btn`/`--leaf-btn`으로 깊게, `--ink-soft` #31475f, 데스크톱 머리말 뒤 옅은 남색 그늘. 밝은 에어로 느낌이 줄었다고 느끼면 버튼을 다시 밝게 하고 글자를 진한 남색으로 바꾸는 쪽이 대안이다.
 
 ## 아직 열린 것
 
