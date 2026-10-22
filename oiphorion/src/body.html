@@ -11,6 +11,10 @@
       <div class="days" id="days" role="group" aria-label="요일">
         <button type="button" data-d="1" aria-pressed="false">월</button><button type="button" data-d="2" aria-pressed="false">화</button><button type="button" data-d="3" aria-pressed="false">수</button><button type="button" data-d="4" aria-pressed="false">목</button><span class="sep" aria-hidden="true"></span><button type="button" data-d="5" aria-pressed="false">금</button><button type="button" data-d="6" aria-pressed="false">토</button><button type="button" data-d="0" aria-pressed="false">일</button>
       </div>
+      <div class="wk-toggle" id="wkToggle" role="group" aria-label="보기 방식">
+        <button type="button" id="wkDay" aria-pressed="true">하루 보기</button><button type="button" id="wkWeek" aria-pressed="false">한 주 보기</button>
+      </div>
+      <button type="button" class="wk-pending" id="wkPending" hidden>지난 일요일 점프 보기</button>
       <output class="route" id="route" for="wake woke" data-line="1" aria-live="polite"></output>
     </section>
   </header>
@@ -20,6 +24,33 @@
     <svg id="trail" aria-hidden="true"><path class="spur" id="spur" d=""/></svg>
     <div id="signText" aria-hidden="true"><b>낙하 한도</b><span>?????</span></div>
     <nav id="nodes" aria-label="하루의 지도"></nav>
+    <section class="wk" id="wkPanel" aria-label="한 주 보기" hidden>
+      <div class="wk-in">
+        <h2 class="wk-title" id="wkTitle"></h2>
+        <p class="wk-offline" id="wkOffline" hidden>기록이 저장되지 않아요 (claude.ai에서 로그인 상태로 열어야 기기 간에 이어져요)</p>
+        <svg class="wk-svg" id="wkSvg" viewBox="0 0 360 300" role="img" aria-label="월요일부터 토요일까지 이어지는 길과 일요일 산꼭대기"></svg>
+        <ol class="wk-days" id="wkDays"></ol>
+        <p class="wk-status" id="wkStatus" aria-live="polite"></p>
+      </div>
+      <div class="wk-jump" id="wkJump" hidden role="dialog" aria-label="일요일 점프" aria-live="polite">
+        <svg class="wk-scene" viewBox="0 0 300 300" aria-hidden="true">
+          <path d="M-10 300 L120 190 Q150 168 180 190 L310 300 Z" fill="#2f7d22"/>
+          <path d="M0 300 L130 200 Q150 186 170 200 L300 300 Z" fill="#6cbf42"/>
+          <ellipse cx="150" cy="196" rx="48" ry="9" fill="#4fa032"/>
+          <g class="wk-door"><rect x="206" y="40" width="46" height="80" rx="23" fill="#fff"/><rect x="214" y="48" width="30" height="64" rx="15" fill="#e8f3ff"/></g>
+          <g class="wk-tramp"><ellipse cx="150" cy="190" rx="30" ry="7" fill="#121c3c" stroke="#2ec4ef" stroke-width="3.5"/><line x1="130" y1="195" x2="127" y2="206" stroke="#10243f" stroke-width="2.5"/><line x1="170" y1="195" x2="173" y2="206" stroke="#10243f" stroke-width="2.5"/></g>
+          <g class="wk-dw"><g class="wk-dw-in">
+            <path d="M126 186 Q127 150 150 134 Q173 150 174 186 Z" fill="#b8402a"/>
+            <circle cx="150" cy="124" r="14" fill="#f2c9a6"/>
+            <path d="M139 138 Q140 160 150 166 Q160 160 161 138 Q155 146 150 145 Q145 146 139 138 Z" fill="#fff"/>
+            <path d="M134 120 Q150 112 166 120 L158 88 Q154 70 138 72 Q150 80 148 90 Z" fill="#d42e22"/>
+            <circle cx="144" cy="123" r="1.8" fill="#20160f"/><circle cx="156" cy="123" r="1.8" fill="#20160f"/>
+          </g></g>
+        </svg>
+        <p class="wk-jump-text" id="wkJumpText"></p>
+        <button type="button" class="wk-jump-skip" id="wkJumpSkip">닫기</button>
+      </div>
+    </section>
     <div class="dwarf idle" id="dwarf" aria-hidden="true">
       <svg viewBox="-6 -16 52 66">
         <defs>
