@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "deep-interview": {
+      "source": "yeachan-heo/oh-my-claudecode",
+      "sourceType": "github",
+      "skillPath": "skills/deep-interview/SKILL.md",
+      "computedHash": "4ee27adfde1cc113b85c78dab6f7adc749ffa120cf74c0f6e445a47b2df85c00"
+    }
+  }
+}
