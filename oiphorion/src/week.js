@@ -8,7 +8,7 @@ const WEEK = (() => {
   const panel = $("wkPanel"), svg = $("wkSvg"), daysEl = $("wkDays"), jumpEl = $("wkJump");
   const NAMES = ["일","월","화","수","목","금","토"];
   const LINE_NAME = {1:"1선 큰길", 2:"2선 들꽃 샛길", 3:"3선 오솔길"};
-  const LINE_COLOR = {1:"#eeb69c", 2:"#6cbf42", 3:"#d9a441"};
+  const LINE_COLOR = {1:"#ddd9c9", 2:"#6cbf42", 3:"#d9a441"};
   // 월~토 구간의 끝점. 마지막은 일요일 산꼭대기
   const P = [[24,274],[120,250],[50,214],[170,190],[80,150],[210,128],[290,66]];
   let open = false, playing = null;
@@ -35,8 +35,13 @@ const WEEK = (() => {
     $("wkTitle").innerHTML = w.practice ? "연습 주" : `${w.weekNo}주째 <small>/ 10주</small>`;
     $("wkOffline").hidden = !!JOURNEY.online;
     $("wkPending").hidden = !pr.pendingJump;
-    const lostOn = w.trampolineLostOn || "";
-    let g = `<path d="M-10 300 L200 150 Q290 40 380 150 L400 300 Z" fill="#cfe6ff" opacity=".9"/><path d="M196 154 L290 52 L360 154 Z" fill="#fff" opacity=".85"/>`;
+    const lostOn = w.trampolineLostOn || "", theme=MAPS[pr.map-1];
+    svg.style.background=`linear-gradient(#c9e0e9,${theme.color}55)`;
+    let g = `<path d="M-10 220 L85 132 L128 160 L205 70 L243 111 L302 51 L380 170 L400 300 L-10 300Z" fill="#9bb4c1" opacity=".65"/>
+      <path d="M-10 300 L126 162 L211 91 L235 48 L242 105 L266 64 L276 117 L295 81 L339 166 L400 218 L400 300Z" fill="#8c979b"/>
+      <path d="M126 162 L235 48 L220 112 L180 156 L193 129Z M242 105 L266 64 L260 109 L276 117 L254 121Z" fill="#edf2f3"/>
+      <path d="M-10 300 L-10 260 Q87 222 126 162 Q183 185 211 144 Q272 162 339 213 L400 265 L400 300Z" fill="${theme.color}"/>
+      <path d="M-10 300 L-10 272 Q96 256 143 204 Q214 246 274 235 L400 300Z" fill="#86a557" opacity=".85"/>`;
     // 길: 바깥 윤곽 + 색 선. 미래는 점선
     days.forEach((d, i) => {
       const dd = seg(i);
@@ -67,7 +72,7 @@ const WEEK = (() => {
       return `<li class="wk-d${gone ? " wk-gone" : ""}" data-line="${d.line}"><b>${nm}</b><span>${LINE_NAME[d.line] || ""}</span><span>${notes}</span></li>`;
     }).join("");
 
-    $("wkStatus").innerHTML = `잃은 모자 <b>${w.hatsLost}</b>개 · 트램펄린 <b>${w.trampolineAlive ? "멀쩡함" : "잃음"}</b> · 지금 <b>${pr.map}</b>번 맵 (5개 중) · <b>${pr.round}</b>회차`;
+    $("wkStatus").innerHTML = `잃은 모자 <b>${w.hatsLost}</b>개 · 트램펄린 <b>${w.trampolineAlive ? "멀쩡함" : "잃음"}</b> · 지금 <b>${pr.map}</b>번 맵 (5개 중) · ${theme.name} · <b>${pr.round}</b>회차`;
     const s = $("wkSummit");
     if (s && sun) {
       s.addEventListener("click", () => playJump());
@@ -99,7 +104,7 @@ const WEEK = (() => {
     const w = JOURNEY.week(), pr = JOURNEY.progress();
     const alive = pj ? pj.result === "advance" : w.trampolineAlive;
     const ending = pj ? !!pj.ending : (alive && pr.map === 5);
-    $("wkJumpText").textContent = !alive ? "이번 주는 같은 맵에서 다시" : ending ? "하얀 문 너머로 — 2회차 시작" : "다음 맵으로!";
+    $("wkJumpText").textContent = !alive ? "이번 주는 같은 맵에서 다시" : ending ? "하얀 문 너머로 — 2회차 시작" : `다음 맵으로! · ${MAPS[Math.min(pr.map,4)].name}`;
     jumpEl.className = "wk-jump" + (alive ? "" : " stay") + (alive && ending ? " ending" : "");
     jumpEl.hidden = false;
     void jumpEl.offsetWidth; jumpEl.classList.add("go");
