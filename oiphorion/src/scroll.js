@@ -54,7 +54,7 @@ function view(){
     h+='<div class="p-actions"><span></span><button class="deeper" data-go="2">한 겹 더 펼치기 · C++ <span aria-hidden="true">↓</span></button></div></div>';
   } else {
     h+='<div class="p-view enter">';
-    b.cpp.forEach(([a,z,cap])=>{
+    b.cpp.forEach(([name,cap])=>{ const [a,z]=ANCHORS[name];
       h+='<section class="p-sec"><div class="cap"><b>'+esc(cap)+'</b><span>study_os.cpp · '+a+'–'+z+'행</span></div>'+codeBlock(CPPL,a,z,[],hlCpp)+'</section>';
     });
     h+='<details class="full"><summary>소스 전체 펼치기 ('+CPPL.length+'줄)</summary>'+codeBlock(CPPL,1,CPPL.length,[],hlCpp)+'</details>';

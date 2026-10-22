@@ -81,6 +81,7 @@ vector<string> split(const string& line, char sep) {
     return out;
 }
 
+// @anchor save
 // ───────────────────────── 저장 / 불러오기 ─────────────────────────
 void save(const State& st) {
     ofstream f(DATA_FILE);
@@ -94,6 +95,7 @@ void save(const State& st) {
     }
     for (const Redo& r : st.redos) f << "REDO|" << r.problem << '|' << r.dueDay << '\n';
 }
+// @end save
 
 State load() {
     State st;
@@ -117,13 +119,16 @@ State load() {
     return st;
 }
 
+// @anchor decideLine
 // ───────────────────────── 하루: 저지선 판단 ─────────────────────────
 Line decideLine(int wokeAt, int wake) {
     if (wokeAt <= wake) return Line::Normal;
     if (wokeAt <= wake + LATE_LIMIT_MIN) return Line::Late;
     return Line::Minimum;
 }
+// @end decideLine
 
+// @anchor planToday
 void planToday(State& st) {
     if (st.wakeMin < 0) {
         int w = -1;
@@ -136,19 +141,25 @@ void planToday(State& st) {
     cout << "\n고정 기상 " << toHHMM(st.wakeMin) << " / 오늘 기상 " << toHHMM(woke) << "\n";
     cout << "먼저: 불 켜기, 창문 열기, 찬물 세수, 쉬운 문제 1개.\n\n";
 
+    // @anchor planToday.normal
     switch (decideLine(woke, st.wakeMin)) {
         case Line::Normal:
             cout << "[1선 · 정상] 오전 · 오후 · 저녁 블록\n";
             break;
+    // @end planToday.normal
         case Line::Late:
             cout << "[2선 · 늦잠] 오전 블록은 지우고 점심 뒤부터 오후 · 저녁 블록\n"
                  << "  오전 블록의 핵심 30분은 저녁 블록 끝에 붙인다\n";
             break;
+        // @anchor planToday.minimum
         case Line::Minimum:
             cout << "[3선 · 크게 늦음] 최소 기준선만: 수학 5문제 + 그날 리뷰 20분\n"
                  << "  이것만 해도 '3선에서 막아 낸 날'이다\n";
             break;
+        // @end planToday.minimum
     }
+// @end planToday
+    // @anchor planToday.always
     cout << "\n항상:\n"
          << "  - 블록은 50분 공부 / 10분 휴식(휴대폰 없이)\n"
          << "  - 점심 뒤 수학 1문제 (습관 신호)\n"
@@ -156,8 +167,10 @@ void planToday(State& st) {
          << "  - 취미 30~60분, 자정 전까지만\n"
          << "  - 자기 전 5분 내일 할 일 적기\n"
          << "  - 내일 기상도 " << toHHMM(st.wakeMin) << "\n\n";
+    // @end planToday.always
 }
 
+// @anchor redos
 // ───────────────────────── 수학: 새 문제 풀기 ─────────────────────────
 void scheduleRedos(State& st, const string& problem, const vector<int>& afterDays) {
     for (int d : afterDays) st.redos.push_back({problem, st.today + d});
@@ -173,7 +186,9 @@ Card makeCard() {
     c.mistakes = ask("  자주 하는 실수: ");
     return c;
 }
+// @end redos
 
+// @anchor solveNew
 void solveNew(State& st) {
     string problem = ask("문제 이름(교재·번호): ");
     cout << "1. 설계: 15분 안에 필요한 연장과 과정을 먼저 적으세요.\n";
@@ -202,7 +217,10 @@ void solveNew(State& st) {
 
     if (askYes("5. 대표 예제 카드로 정리할까요?")) st.cards.push_back(makeCard());
 }
+// @end solveNew
 
+// @anchor mixedSet
+// @anchor mixedSet.head
 // ───────────────────────── 수학: 섞어서 풀기 ─────────────────────────
 void mixedSet(State& st) {
     if (st.cards.empty()) {
@@ -214,6 +232,7 @@ void mixedSet(State& st) {
     shuffle(order.begin(), order.end(), mt19937{random_device{}()});
     if (order.size() > 10) order.resize(10);
 
+// @end mixedSet.head
     cout << "6. 섞인 세트: 각 문제의 유형을 먼저 판정한 뒤 푸세요.\n";
     for (size_t idx : order) {
         Card& c = st.cards[idx];
@@ -232,7 +251,9 @@ void mixedSet(State& st) {
         }
     }
 }
+// @end mixedSet
 
+// @anchor showDue
 // ───────────────────────── 조회 ─────────────────────────
 void showDue(const State& st) {
     cout << st.today << "일차에 다시 풀 문제:\n";
@@ -245,7 +266,9 @@ void showDue(const State& st) {
     }
     if (n == 0) cout << "  없음\n";
 }
+// @end showDue
 
+// @anchor showCards
 void showCards(const State& st) {
     if (st.cards.empty()) cout << "카드가 없어요.\n";
     for (const Card& c : st.cards) {
@@ -255,7 +278,9 @@ void showCards(const State& st) {
             cout << "  변형: " << v.difference << " / 단서: " << v.signal << " / 열쇠: " << v.key << "\n";
     }
 }
+// @end showCards
 
+// @anchor endOfDay
 void endOfDay(State& st) {
     // 오늘 다시 풀 문제: 풀었으면 지우고, 못 풀었으면 내일로 넘긴다(버리지 않는다)
     vector<Redo> kept;
@@ -272,6 +297,7 @@ void endOfDay(State& st) {
     cout << "하루 마감. 내일은 " << st.today << "일차, 기상 "
          << (st.wakeMin < 0 ? "미정" : toHHMM(st.wakeMin)) << ".\n";
 }
+// @end endOfDay
 
 // ───────────────────────── 수업 날 (월~목) ─────────────────────────
 struct Lecture {
@@ -280,19 +306,31 @@ struct Lecture {
 };
 
 const int COMMUTE_MIN = 60;  // 집 ↔ 강의실
-const vector<int> LEAVE_AT = {570, 600, 570, 600};  // 집을 나서는 시각: 월·수 09:30, 화·목 10:00
+// @anchor LEAVE_AT
+const vector<int> LEAVE_AT = {570, 600, 570, 600};  // 집을 나서는 시각(분) 월·화·수·목. 페이지도 이 줄을 읽는다
+// @end LEAVE_AT
+// @anchor TIMETABLE
 const vector<vector<Lecture>> TIMETABLE = {  // 0=월 1=화 2=수 3=목
+    // @anchor TIMETABLE.mon
     {{"프로그래밍언어론", 630, 720}, {"알고리즘", 780, 900}, {"게임프로그래밍", 900, 1020}, {"기술창조와특허", 1080, 1230}},
+    // @end TIMETABLE.mon
     {{"시스템소프트웨어", 600, 720}, {"미적분학및연습2", 840, 930}, {"공학수학1", 930, 1020}},
+    // @anchor TIMETABLE.wed
     {{"프로그래밍언어론", 630, 720}, {"알고리즘", 810, 930}, {"게임프로그래밍", 930, 1050}},
+    // @end TIMETABLE.wed
     {{"시스템소프트웨어", 600, 720}, {"미적분학및연습2", 840, 930}, {"공학수학1", 930, 1020}},
 };
+// @end TIMETABLE
+// @anchor EVENING_FOCUS
 const vector<string> EVENING_FOCUS = {
+    // @anchor EVENING_FOCUS.mon
     "오늘 들은 프언론 · 알골 훑기 1블록",  // 월: 21:30 도착이라 짧다
+    // @end EVENING_FOCUS.mon
     "시소프 리뷰 1블록 · 미적2/공수1 새 문제 2블록",
     "알골 리뷰 1블록 · 프언론 리뷰 1블록 · 게임프로그래밍 과제 1블록",
     "미적2/공수1 섞어서 풀기 2블록 · 시소프 프리뷰 1블록",
 };
+// @end EVENING_FOCUS
 const int CURFEW_PREP = 1380;  // 23:00 화면 끄기
 
 void planSchoolDay(State& st) {
@@ -311,11 +349,13 @@ void planSchoolDay(State& st) {
     int woke = -1;
     while (woke < 0) woke = parseHHMM(ask("오늘 일어난 시각 (예: 08:10): "));
 
+    // @anchor school.morning
     const vector<Lecture>& lec = TIMETABLE[day];
     int leave = LEAVE_AT[day];
     int margin = leave - woke;  // 집을 나서기까지 남은 시간
     bool late = margin <= 0;
 
+    // @anchor school.route
     cout << "\n[" << names[day] << "요일] 기상 " << toHHMM(woke) << " → 집을 나설 시각 " << toHHMM(leave) << "\n";
     if (margin > 60) {
         cout << "[큰길 · 여유 아침] 약 → 씻기 → 밥 차려 먹기 → 약 → 도시락 싸기\n"
@@ -325,8 +365,12 @@ void planSchoolDay(State& st) {
     } else {
         cout << "[오솔길 · 출발 시각이 지났다] 첫 수업은 놓쳐도 나머지 수업은 간다. 저녁은 최소 기준선만\n";
     }
+    // @end school.route
+    // @end school.morning
 
+    // @anchor school.lectures
     cout << "통학 중: 카드와 변형 노트 넘겨 보기 (서서 가니까 읽기만)\n";
+    // @anchor school.gap
     for (size_t i = 0; i < lec.size(); ++i) {
         cout << "  " << toHHMM(lec[i].start) << "–" << toHHMM(lec[i].end) << " " << lec[i].name << "\n";
         int gap = (i + 1 < lec.size()) ? lec[i + 1].start - lec[i].end : 0;
@@ -335,22 +379,35 @@ void planSchoolDay(State& st) {
         else if (gap >= 60)
             cout << "    공강: " << (lec[i].end >= 1020 ? "저녁밥" : "점심") << "\n";
     }
+    // @end school.gap
     cout << "점심 뒤 수학 1문제 (습관 신호)\n";
+    // @end school.lectures
 
+    // @anchor school.evening
+    // @anchor school.evening.mon
+    // @anchor school.home
     int home = lec.back().end + COMMUTE_MIN;  // 저녁 블록은 집에 도착한 시각부터
     cout << "귀가 통학 " << toHHMM(lec.back().end) << "–" << toHHMM(home) << ": 카드만 넘겨 보기\n";
+    // @end school.home
+    // @anchor school.minimum
     if (late)
         cout << toHHMM(home) << "– 최소 기준선: 수학 5문제 + 리뷰 20분\n";
+    // @end school.minimum
     else if (day == 0)
         cout << toHHMM(home) << "–" << toHHMM(CURFEW_PREP) << " 저녁 블록: " << EVENING_FOCUS[day] << "\n";
+    // @end school.evening.mon
     else
         cout << toHHMM(home) << "–" << toHHMM(CURFEW_PREP) << " 저녁 블록: 도착하자마자 1블록 → 저녁밥 → 2·3블록 → 취미 30~60분\n"
              << "  초점: " << EVENING_FOCUS[day] << "\n";
+    // @end school.evening
+    // @anchor school.night
     cout << toHHMM(CURFEW_PREP) << " 화면 끄기, 내일 옷·가방 챙기기, 내일 할 일 5분 적기\n"
          << "내일 기상도 " << toHHMM(st.wakeMin) << "\n\n";
+    // @end school.night
 }
 
 // ───────────────────────── 메인 루프 ─────────────────────────
+// @anchor main
 int main() {
     State st = load();
     while (true) {
@@ -370,3 +427,4 @@ int main() {
         save(st);  // 메뉴마다 자동 저장
     }
 }
+// @end main
