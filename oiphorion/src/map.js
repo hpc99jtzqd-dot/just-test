@@ -122,6 +122,7 @@ uniform vec2 uRes; uniform vec3 uRo,uCu,uCv,uCw; uniform float uFl;
 uniform sampler2D uHm, uCl; uniform vec2 uHN; uniform vec4 uDom; uniform vec3 uL;
 uniform vec4 uNodes[10]; uniform vec4 uTrees[24]; uniform vec4 uPosts[20];
 uniform vec3 uTent, uSign, uFlag, uDoor; uniform float uSignRot;
+uniform vec4 uDw, uDw2;  // 난쟁이: 발 위치 xyz · 바라보는 방향 / 크기 · 찌그러짐 · 켜짐 · 뜬 높이
 const float CY=${CLOUD_Y.toFixed(1)}, CA=${CLOUD_AMP.toFixed(2)}, CS=256.0;
 vec3 lin(vec3 c){return pow(c,vec3(2.2));}
 float h12(vec2 p){vec3 p3=fract(vec3(p.xyx)*.1031);p3+=dot(p3,p3.yzx+33.33);return fract((p3.x+p3.y)*p3.z);}
@@ -164,6 +165,32 @@ float smin(float a,float b,float k){float h=clamp(.5+.5*(b-a)/k,0.,1.);return mi
 float sdNode(vec3 q){vec2 d=vec2(length(q.xz)-1.3,abs(q.y)-.1);return min(max(d.x,d.y),0.)+length(max(d,0.))-.16;}
 float sdCone(vec3 p,vec2 c,float h){vec2 q=h*vec2(c.x/c.y,-1.);vec2 w=vec2(length(p.xz),p.y);vec2 a=w-q*clamp(dot(w,q)/dot(q,q),0.,1.);vec2 b=w-q*vec2(clamp(w.x/q.x,0.,1.),1.);float k=sign(q.y);float d=min(dot(a,a),dot(b,b));float s=max(k*(w.x*q.y-w.y*q.x),k*(w.y-q.y));return sqrt(d)*sign(s);}
 vec3 rotY(vec3 p,float a){float c=cos(a),s=sin(a);return vec3(c*p.x-s*p.z,p.y,s*p.x+c*p.z);}
+float sdCapCone(vec3 p,float h,float r1,float r2){vec2 q=vec2(length(p.xz),p.y),k1=vec2(r2,h),k2=vec2(r2-r1,2.*h);vec2 ca=vec2(q.x-min(q.x,q.y<0.?r1:r2),abs(q.y)-h);vec2 cb=q-k1+k2*clamp(dot(k1-q,k2)/dot(k2,k2),0.,1.);float s=(cb.x<0.&&ca.y<0.)?-1.:1.;return s*sqrt(min(dot(ca,ca),dot(cb,cb)));}
+float sdEll(vec3 p,vec3 r){float k0=length(p/r),k1=length(p/(r*r));return k0*(k0-1.)/k1;}
+float sdCap(vec3 p,vec3 a,vec3 b,float r){vec3 pa=p-a,ba=b-a;return length(pa-ba*clamp(dot(pa,ba)/dot(ba,ba),0.,1.))-r;}
+/* 난쟁이 좌표: 발이 원점, 앞이 +z, 트램펄린은 등(-z). 세계 → 몸 좌표로 옮겨 잰다 */
+vec3 dwLocal(vec3 p){vec3 q=rotY(p-uDw.xyz,-uDw.w)/uDw2.x;q.y/=1.-uDw2.y*.14;q.xz/=1.+uDw2.y*.12;return q;}
+vec3 trLocal(vec3 q){vec3 t=q-vec3(0.,1.35,-.74);float c=.995,s=-.105;  /* 등에 기대 위가 살짝 앞으로 */t=vec3(t.x,c*t.y-s*t.z,s*t.y+c*t.z);c=.961;s=-.276;return vec3(c*t.x-s*t.y,s*t.x+c*t.y,t.z);}
+vec2 dwarf(vec3 p){
+  if(uDw2.z<.5) return vec2(1e5,20.);
+  vec3 q=dwLocal(p);float k=uDw2.x*(1.-uDw2.y*.14);
+  float b=length(q-vec3(0.,1.8,-.3))-2.3; if(b>.3) return vec2(b*k,20.);
+  vec3 m=vec3(abs(q.x),q.yz);
+  float d=sdCapCone(q-vec3(0.,.8,0.),.74,.7,.42)-.07,id=20.;
+  float arm=sdCap(m,vec3(.3,1.42,0.),vec3(.58,1.08,.18),.13);d=smin(d,arm,.1);
+  float t=length(m-vec3(.62,1.04,.22))-.19;if(t<d){d=t;id=24.;}
+  t=sdEll(m-vec3(.24,.07,.22),vec3(.16,.1,.24));if(t<d){d=t;id=27.;}
+  t=length(q-vec3(0.,1.92,.06))-.4;if(t<d){d=t;id=22.;}
+  t=length(q-vec3(0.,1.93,.47))-.12;if(t<d){d=t;id=22.;}
+  t=sdEll(q-vec3(0.,1.5,.28),vec3(.43,.46,.28));if(t<d){d=t;id=23.;}
+  vec3 h=q;h.z+=(h.y-2.15)*.22;  // 모자 끝이 뒤로 휜다
+  t=sdCone(h-vec3(0.,3.3,-.06),vec2(.4,.917),1.1);t=smin(t,sdEll(q-vec3(0.,2.24,-.03),vec3(.47,.14,.47)),.08);if(t<d){d=t;id=21.;}
+  vec3 r=trLocal(q);
+  t=length(vec2(length(r.xy)-.95,r.z))-.1;if(t<d){d=t;id=26.;}
+  vec2 cy=vec2(length(r.xy)-.92,abs(r.z)-.04);t=min(max(cy.x,cy.y),0.)+length(max(cy,0.));if(t<d){d=t;id=25.;}
+  vec3 rl=vec3(abs(r.x),r.yz);t=sdCap(rl,vec3(.5,-.78,-.04),vec3(.66,-1.08,-.4),.05);if(t<d){d=t;id=27.;}
+  return vec2(d*k,id);
+}
 vec2 obj(vec3 p){
   float d=1e5,id=0.;
   for(int i=0;i<10;i++){vec3 q=p-uNodes[i].xyz;float b=length(q)-1.7;float dd=b>.4?b:sdNode(q);if(dd<d){d=dd;id=10.+float(i);}}
@@ -184,14 +211,19 @@ vec2 obj(vec3 p){
     if(b>.3){if(b<d){d=b;id=9.;}}
     else{float fr=sdBox(q-vec3(0.,1.35,0.),vec3(.78,1.42,.1));float pn=sdBox(q-vec3(0.,1.3,.06),vec3(.64,1.28,.08));
       if(fr<d){d=fr;id=9.;} if(pn<d){d=pn;id=9.5;}}}
+  vec2 w=dwarf(p);if(w.x<d){d=w.x;id=w.y;}
   return vec2(d,id);
 }
 vec3 objN(vec3 p){vec2 e=vec2(.004,-.004);return normalize(e.xyy*obj(p+e.xyy).x+e.yyx*obj(p+e.yyx).x+e.yxy*obj(p+e.yxy).x+e.xxx*obj(p+e.xxx).x);}
-float shadow(vec3 p){
+float shadow(vec3 p,float withDw){
   float res=1.,t=.25;
   for(int i=0;i<56;i++){vec3 q=p+uL*t;if(q.y>42.)break;float h=q.y-hm(q.xz);res=min(res,9.*h/t);if(res<.01)break;t+=clamp(h*.45,.2,5.);}
   for(int i=0;i<24;i++){vec4 tr=uTrees[i];vec3 oc=tr.xyz-p;float b=dot(oc,uL);if(b>0.){float dd=length(oc-uL*b)-tr.w;res=min(res,clamp(.5+dd*2./max(b,.5)*2.,0.,1.));}}
   for(int i=0;i<10;i++){vec3 oc=uNodes[i].xyz-p;float b=dot(oc,uL);if(b>0.&&b<6.){float dd=length(oc-uL*b)-1.4;res=min(res,clamp(.4+dd*3.,0.,1.));}}
+  if(withDw>.5&&uDw2.z>.5){float s=uDw2.x;
+    for(int i=0;i<4;i++){vec3 c;float r;
+      if(i==0){c=vec3(0.,.55,0.);r=.62;}else if(i==1){c=vec3(0.,1.45,.05);r=.5;}else if(i==2){c=vec3(0.,2.45,-.1);r=.38;}else{c=vec3(0.,1.35,-.74);r=.88;}
+      vec3 oc=uDw.xyz+rotY(c*s,uDw.w)-p;float b=dot(oc,uL);if(b>0.){float dd=length(oc-uL*b)-r*s;res=min(res,clamp(.3+dd*2.2,0.,1.));}}}
   return clamp(res,0.,1.);
 }
 vec3 SUN=vec3(1.,.95,.86)*2.7;
@@ -237,7 +269,8 @@ vec3 shadeGround(vec3 p,vec3 rd,float t){
   for(int i=0;i<10;i++){float d=length(p.xz-uNodes[i].xz);ao*=mix(.45,1.,smoothstep(1.2,2.6,d));}
   for(int i=0;i<24;i+=3){vec4 tr=uTrees[i];float d=length(p.xz-tr.xz);ao*=mix(.5,1.,smoothstep(tr.w*.4,tr.w*1.9,d));}
   ao*=mix(.55,1.,smoothstep(-6.,0.,s+2.));
-  float dif=max(dot(n,uL),0.)*shadow(p+n*.08);
+  if(uDw2.z>.5){float dd=length(p.xz-uDw.xz)/uDw2.x;ao*=mix(mix(.42,.9,clamp(uDw2.w*.7,0.,1.)),1.,smoothstep(.35,1.3,dd));}
+  float dif=max(dot(n,uL),0.)*shadow(p+n*.08,1.);
   vec3 col=alb*(SUN*dif+AMB*(.55+.45*n.y)*ao+lin(vec3(.5,.62,.4))*.12*max(-n.y,0.));
   col+=alb*AMB*.12*pow(1.-max(dot(n,-rd),0.),3.);
   return col;
@@ -248,7 +281,7 @@ vec3 shadeCloud(vec3 p,vec3 rd,float t){
   float far=smoothstep(150.,700.,t);n=normalize(mix(n,vec3(0.,1.,0.),far*.7));
   float dif=clamp(dot(n,uL)*.65+.35,0.,1.);
   float sh=1.;
-  if(p.x>-80.&&p.x<150.&&p.z>-120.&&p.z<60.) sh=shadow(p+vec3(0.,.1,0.));
+  if(p.x>-80.&&p.x<150.&&p.z>-120.&&p.z<60.) sh=shadow(p+vec3(0.,.1,0.),1.);
   float cav=mix(.62,1.,c.a)*mix(.85,1.,c.r);
   vec3 lit=vec3(2.45,2.42,2.38),dark=lin(vec3(.52,.64,.86))*1.3;
   vec3 col=mix(dark,lit,dif*mix(.35,1.,sh))*cav;
@@ -257,11 +290,27 @@ vec3 shadeCloud(vec3 p,vec3 rd,float t){
 }
 vec3 shadeObj(vec3 p,vec3 rd,float id,float t){
   vec3 n=objN(p);
-  float sh=shadow(p+n*.06);
+  float sh=shadow(p+n*.06,0.);
   float dif=max(dot(n,uL),0.)*sh;
   vec3 alb=vec3(.5);float spec=0.,gloss=8.,emi=0.;
   vec3 ref=reflect(rd,n);float fre=pow(1.-max(dot(n,-rd),0.),5.);
-  if(id>=10.){
+  if(id>=19.5){
+    vec3 q=dwLocal(p);
+    if(id<20.5){alb=lin(vec3(.80,.27,.17));
+      float belt=step(abs(q.y-.8),.07);alb=mix(alb,lin(vec3(.29,.14,.07)),belt);
+      if(abs(q.y-.8)<.1&&abs(q.x)<.1&&q.z>0.){alb=lin(vec3(.97,.80,.30));spec=.8;gloss=60.;}
+      alb*=.9+.1*smoothstep(0.,1.6,q.y);}
+    else if(id<21.5){alb=lin(vec3(.90,.17,.12));spec=.25;gloss=20.;}
+    else if(id<22.5){alb=lin(vec3(.98,.80,.66));
+      vec3 e=vec3(abs(q.x)-.15,q.y-2.04,q.z-.4);if(q.z>0.&&length(e)<.065)alb=lin(vec3(.12,.1,.12));
+      if(length(q-vec3(0.,1.93,.47))<.13)alb=lin(vec3(1.,.64,.54));}
+    else if(id<23.5){alb=lin(vec3(.97,.96,.93))*(.9+.1*vn(q.xy*18.));}
+    else if(id<24.5){alb=lin(vec3(.25,.56,.23));}
+    else if(id<25.5){vec3 r=trLocal(q);float rr=length(r.xy);alb=mix(lin(vec3(.10,.17,.42)),lin(vec3(.23,.35,.66)),smoothstep(.9,.1,rr)*.6);
+      alb=mix(alb,lin(vec3(.85,.9,1.)),smoothstep(.03,0.,abs(rr-.6))*.25);spec=.22;gloss=60.;}
+    else if(id<26.5){alb=lin(vec3(.20,.78,.95));spec=1.;gloss=90.;}
+    else {alb=lin(vec3(.17,.18,.22));}
+  } else if(id>=10.){
     int k=int(id-10.+.5);vec4 nd=vec4(0.);
     for(int i=0;i<10;i++){if(i==k) nd=uNodes[i];}
     vec3 q=p-nd.xyz;float kind=nd.w;
@@ -322,7 +371,7 @@ void main(){
   float tn=max(max(tmn.x,tmn.y),tmn.z),tf=min(min(tmx.x,tmx.y),tmx.z);
   float oid=0.,ot=-1.;
   if(tf>max(tn,0.)){float tt=max(tn,.5);float lim=hit>0.?min(tf,hit):tf;
-    for(int i=0;i<140;i++){vec2 o=obj(ro+rd*tt);if(o.x<.0015*tt){ot=tt;oid=o.y;break;}tt+=o.x*.9;if(tt>lim)break;}}
+    for(int i=0;i<160;i++){vec2 o=obj(ro+rd*tt);if(o.x<(o.y>19.5?.0004:.0015)*tt){ot=tt;oid=o.y;break;}tt+=o.x*.9;if(tt>lim)break;}}
   vec3 col;
   if(ot>0.){col=shadeObj(ro+rd*ot,rd,oid,ot);col=fogit(col,ot,rd);}
   else if(hit>0.){vec3 p=ro+rd*hit;col=kind<1.5?shadeGround(p,rd,hit):shadeCloud(p,rd,hit);col=fogit(col,hit,rd);}
@@ -351,7 +400,7 @@ function initGL(){
   gl.useProgram(prog);
   const buf=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,buf); gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
   const loc=gl.getAttribLocation(prog,"a"); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
-  ["uRes","uRo","uCu","uCv","uCw","uFl","uHm","uCl","uHN","uDom","uL","uNodes","uTrees","uPosts","uTent","uSign","uFlag","uDoor","uSignRot"].forEach(n=>U[n]=gl.getUniformLocation(prog,n));
+  ["uRes","uRo","uCu","uCv","uCw","uFl","uHm","uCl","uHN","uDom","uL","uNodes","uTrees","uPosts","uTent","uSign","uFlag","uDoor","uSignRot","uDw","uDw2"].forEach(n=>U[n]=gl.getUniformLocation(prog,n));
   // 높이 지도
   const hd=new Uint8Array(DOM.nx*DOM.nz*4);
   for(let k=0;k<HM.length;k++){ const v=Math.round(Math.max(0,Math.min(1,(HM[k]+60)/100))*65535); hd[k*4]=v>>8; hd[k*4+1]=v&255; hd[k*4+2]=Math.round(Math.min(QM[k],3)/3*255); hd[k*4+3]=Math.round((Math.max(-8,Math.min(8,SM[k]))+8)/16*255); }
@@ -374,6 +423,7 @@ function initGL(){
   gl.uniform3f(U.uSign,SIGN[0],groundY(SIGN[0],SIGN[1])-.05,SIGN[1]);
   gl.uniform3f(U.uFlag,FLAG[0],groundY(FLAG[0],FLAG[1])-.1,FLAG[1]);
   gl.uniform3f(U.uDoor,DOOR[0],CLOUD_Y+2.6,DOOR[1]);
+  dw.hidden=true;  // WebGL이 되면 난쟁이는 셰이더가 그린다. 안 되면 SVG가 남는다
   return true;
 }
 function nodeUniforms(){
@@ -392,11 +442,11 @@ function render(){
   cv.width=w; cv.height=h; gl.viewport(0,0,w,h);
   gl.uniform2f(U.uRes,w,h); gl.uniform3fv(U.uRo,CAM.ro); gl.uniform3fv(U.uCu,CAM.cu); gl.uniform3fv(U.uCv,CAM.cv); gl.uniform3fv(U.uCw,CAM.cw); gl.uniform1f(U.uFl,CAM.fl);
   gl.uniform1f(U.uSignRot,Math.atan2(CAM.ro[0]-SIGN[0],CAM.ro[2]-SIGN[1]));
-  nodeUniforms();
+  nodeUniforms(); dwarfUniforms(); DW.drawn=dwarfRect();
   gl.enable(gl.SCISSOR_TEST);
   const band=Math.max(6,Math.floor(140000/w)); let y=h; raster.done=false; stageEl.classList.add("painting");
   const step=()=>{ const y0=Math.max(0,y-band); gl.scissor(0,y0,w,y-y0); gl.drawArrays(gl.TRIANGLES,0,3); y=y0;
-    if(y>0) raster.raf=requestAnimationFrame(step); else { raster.done=true; stageEl.classList.remove("painting"); window.__rendered=(window.__rendered||0)+1; } };
+    if(y>0) raster.raf=requestAnimationFrame(step); else { raster.done=true; stageEl.classList.remove("painting"); if(DW.dirty) drawDwarf(); window.__rendered=(window.__rendered||0)+1; } };
   raster.raf=requestAnimationFrame(step);
 }
 
@@ -426,7 +476,61 @@ function decorate(){
     n.classList.toggle("off",isOff(b)); n.classList.toggle("now",id===now); n.classList.toggle("sel",id===sel); n.classList.toggle("secret",id==="minimum"); });
   stageEl.dataset.line=state.line;
 }
-function placeDwarf(x,z,hop,squash){
+/* ───── 난쟁이 ─────
+   셰이더 안에서 그린다. 풍경은 한 번만 그리므로, 난쟁이가 움직이면
+   있던 자리와 갈 자리(그림자 포함)를 감싸는 사각형만 scissor로 다시 그린다.
+   픽셀마다 결과가 정해져 있어서 이어 붙인 자리에 이음매가 생기지 않는다. */
+const reduce=matchMedia("(prefers-reduced-motion: reduce)").matches;
+const DW_S=1.25, DW={x:0,y:0,z:0,yaw:0,goal:null,hop:0,sq:0,on:false,dirty:false,drawn:null};
+/* 노드 원판 위에서는 원판 윗면에, 아니면 땅에 발을 디딘다 */
+function feetY(x,z){ const g=groundY(x,z); let y=g;
+  for(const id of NODE_ORDER){ const d=Math.hypot(x-NXZ[id][0],z-NXZ[id][1]); if(d<1.6) y=Math.max(y,g+(nodeY(id)+.26-g)*smooth(1.6,1.15,d)); }
+  return y; }
+function dwarfUniforms(){ if(!gl) return;
+  gl.uniform4f(U.uDw,DW.x,DW.y+DW.hop,DW.z,DW.yaw); gl.uniform4f(U.uDw2,DW_S,DW.sq,DW.on?1:0,DW.hop); }
+const DW_L=v3.norm([-.62,.66,.42]);
+function dwarfRect(){
+  if(!DW.on||!CAM) return null;
+  const c=Math.cos(DW.yaw), s=Math.sin(DW.yaw), k=DW_S*1.18, pts=[], y0=DW.y+DW.hop;
+  for(const lx of [-1.2,1.2]) for(const lz of [-1.8,1]) for(const ly of [-.1,3.75]){
+    const P=[DW.x+(c*lx-s*lz)*k, y0+ly*k, DW.z+(s*lx+c*lz)*k]; pts.push(P);
+    if(ly>0){ const gy=DW.y-.2, t=(P[1]-gy)/DW_L[1]; pts.push([P[0]-DW_L[0]*t,gy,P[2]-DW_L[2]*t]); } }
+  for(const a of [0,1.57,3.14,4.71]) pts.push([DW.x+Math.cos(a)*1.5*DW_S,DW.y,DW.z+Math.sin(a)*1.5*DW_S]);
+  const sx=cv.width/VW.W, sy=cv.height/VW.H; let x0=1e9,x1=-1e9,ya=1e9,yb=-1e9;
+  pts.forEach(P=>{ const q=project(P); x0=Math.min(x0,q[0]); x1=Math.max(x1,q[0]); ya=Math.min(ya,q[1]); yb=Math.max(yb,q[1]); });
+  const pad=4;
+  return [Math.floor(x0*sx)-pad, Math.floor(cv.height-yb*sy)-pad, Math.ceil(x1*sx)+pad, Math.ceil(cv.height-ya*sy)+pad];
+}
+function drawRect(r){ if(!r) return;
+  const x0=Math.max(0,r[0]), y0=Math.max(0,r[1]), x1=Math.min(cv.width,r[2]), y1=Math.min(cv.height,r[3]);
+  if(x1<=x0||y1<=y0) return; gl.scissor(x0,y0,x1-x0,y1-y0); gl.drawArrays(gl.TRIANGLES,0,3); }
+function drawDwarf(){
+  if(!gl) return;
+  if(!raster.done){ DW.dirty=true; return; }  // 풍경을 그리는 중이면 다 그린 뒤에
+  DW.dirty=false; const a=DW.drawn, b=dwarfRect(); dwarfUniforms();
+  if(a&&b&&a[0]<b[2]&&b[0]<a[2]&&a[1]<b[3]&&b[1]<a[3]) drawRect([Math.min(a[0],b[0]),Math.min(a[1],b[1]),Math.max(a[2],b[2]),Math.max(a[3],b[3])]);
+  else { drawRect(a); drawRect(b); }
+  DW.drawn=b;
+}
+const angTo=(a,b)=>a+Math.atan2(Math.sin(b-a),Math.cos(b-a));
+/* 가만히 있을 땐 카메라 쪽을 보되, 등의 트램펄린이 보이게 비스듬히 선다 */
+const idleYaw=(x,z)=>Math.atan2(-(CAM.ro[0]-x),CAM.ro[2]-z)+.6;
+function placeDwarf(x,z,hop,squash,yaw){
+  if(!gl){ placeDwarfSVG(x,z,hop,squash); return; }
+  DW.x=x; DW.z=z; DW.y=feetY(x,z); DW.hop=hop||0; DW.sq=squash||0; DW.on=true;
+  if(yaw===undefined){ DW.goal=angTo(DW.yaw,idleYaw(x,z)); if(reduce||!DW.drawn) DW.yaw=DW.goal; } else { DW.goal=null; DW.yaw=yaw; }
+  drawDwarf();
+}
+/* 숨쉬기: 가만히 서 있을 때 살짝 눌렸다 펴진다. 1초에 열두 번쯤만 다시 그린다 */
+let breathT=0;
+(function breathe(now){
+  requestAnimationFrame(breathe);
+  if(!gl||reduce||walking||!DW.on||now-breathT<83) return; breathT=now;
+  DW.sq=.16*(.5-.5*Math.cos(now/1800*Math.PI*2));
+  if(DW.goal!==null) DW.yaw+=(DW.goal-DW.yaw)*.3;  // 걷기를 마치면 천천히 돌아선다
+  drawDwarf();
+})(0);
+function placeDwarfSVG(x,z,hop,squash){
   const y=groundY(x,z), feet=project([x,y,z]), head=project([x,y+3.4,z]);
   const hpx=Math.max(14,feet[1]-head[1]), w=hpx*.9, lift=hop?(project([x,y+hop,z])[1]-feet[1]):0;
   dw.style.setProperty("--w",w+"px");
@@ -443,7 +547,6 @@ function route(a,b){
   const r1=slice(SPUR,sm,0).concat(slice(ROAD,mi("dawn"),mi(b))), r2=slice(SPUR,sm,se).concat(slice(ROAD,mi("closing"),mi(b)));
   return plen(r1)<=plen(r2)?r1:r2;
 }
-const reduce=matchMedia("(prefers-reduced-motion: reduce)").matches;
 function walkTo(id){
   if(walking){ cancelAnimationFrame(walking.raf); at=walking.to; walking=null; }
   sel=id; showInfo(); decorate();
@@ -457,8 +560,9 @@ function walkTo(id){
     let i=1; while(i<cum.length-1&&cum[i]<d) i++;
     const f=(d-cum[i-1])/((cum[i]-cum[i-1])||1), x=pts[i-1][0]+(pts[i][0]-pts[i-1][0])*f, z=pts[i-1][1]+(pts[i][1]-pts[i-1][1])*f;
     const a=project([pts[i-1][0],0,pts[i-1][1]]), b=project([pts[i][0],0,pts[i][1]]); dw.classList.toggle("flip",b[0]<a[0]-.01);
+    const want=Math.atan2(-(pts[i][0]-pts[i-1][0]),pts[i][1]-pts[i-1][1]); DW.yaw=DW.yaw+(angTo(DW.yaw,want)-DW.yaw)*.18;
     const ph=(d/hopLen)%1, hop=Math.sin(ph*Math.PI)*.95*(1-Math.pow(1-Math.min(1,k*6),2))*(k>.97?0:1), sq=ph<.12||ph>.88?.8:0;
-    placeDwarf(x,z,hop,sq*(k<.98?1:0));
+    placeDwarf(x,z,hop,sq*(k<.98?1:0),DW.yaw);
     if(k<1) walking.raf=requestAnimationFrame(step); else { walking=null; at=id; dw.classList.add("idle"); placeDwarf(NXZ[id][0],NXZ[id][1]); }
   };
   walking.raf=requestAnimationFrame(step);
