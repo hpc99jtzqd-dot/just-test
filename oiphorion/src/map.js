@@ -525,7 +525,7 @@ function placeDwarf(x,z,hop,squash,yaw){
 let breathT=0;
 (function breathe(now){
   requestAnimationFrame(breathe);
-  if(!gl||reduce||walking||!DW.on||now-breathT<83) return; breathT=now;
+  if(!gl||reduce||walking||!DW.on||!ov.hidden||now-breathT<83) return; breathT=now;  // 두루마리가 덮고 있으면 쉰다
   DW.sq=.16*(.5-.5*Math.cos(now/1800*Math.PI*2));
   if(DW.goal!==null) DW.yaw+=(DW.goal-DW.yaw)*.3;  // 걷기를 마치면 천천히 돌아선다
   drawDwarf();
@@ -547,18 +547,46 @@ function route(a,b){
   const r1=slice(SPUR,sm,0).concat(slice(ROAD,mi("dawn"),mi(b))), r2=slice(SPUR,sm,se).concat(slice(ROAD,mi("closing"),mi(b)));
   return plen(r1)<=plen(r2)?r1:r2;
 }
+/* 걷는 도중에 다른 칸을 누르면: 지금 자리를 길(큰길·샛길) 위의 한 점으로 찾아 거기서 바로 새 길을 잡고,
+   지금 속도를 이어받는다(반대쪽으로 꺾을 때만 멈췄다가 돈다). 순간이동하지 않는다. */
+function locate(x,z){ let best={d:1e9};
+  for(const L of [ROAD,SPUR]) for(let j=0;j<L.length-1;j++){ const [ax,az]=L[j],[bx,bz]=L[j+1],dx=bx-ax,dz=bz-az,l2=dx*dx+dz*dz||1;
+    const t=Math.max(0,Math.min(1,((x-ax)*dx+(z-az)*dz)/l2)), d=Math.hypot(x-ax-dx*t,z-az-dz*t); if(d<best.d) best={d,L,u:j+t}; }
+  return best; }
+const along=(L,u,k)=>k>=u?L.slice(Math.ceil(u-1e-6),k+1):L.slice(k,Math.floor(u+1e-6)+1).reverse();
+function routeFrom(x,z,id){
+  const {L,u}=locate(x,z), mi=n=>MAIN_NODE_CTRL[n]*SEG, sm=SEG, se=SPUR.length-1, opts=[];
+  if(L===ROAD){
+    if(id!=="minimum") opts.push(along(ROAD,u,mi(id)));
+    else opts.push(along(ROAD,u,mi("dawn")).concat(slice(SPUR,0,sm).slice(1)), along(ROAD,u,mi("closing")).concat(slice(SPUR,se,sm).slice(1)));
+  } else {
+    if(id==="minimum") opts.push(along(SPUR,u,sm));
+    else opts.push(along(SPUR,u,0).concat(slice(ROAD,mi("dawn"),mi(id)).slice(1)), along(SPUR,u,se).concat(slice(ROAD,mi("closing"),mi(id)).slice(1)));
+  }
+  return opts.map(o=>[[x,z]].concat(o)).reduce((a,b)=>plen(a)<=plen(b)?a:b);
+}
+function cumOf(pts){ const c=[0]; for(let i=1;i<pts.length;i++) c.push(c[i-1]+Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1])); return c; }
 function walkTo(id){
-  if(walking){ cancelAnimationFrame(walking.raf); at=walking.to; walking=null; }
+  let pts, v0=0;
+  if(walking){ cancelAnimationFrame(walking.raf); const [x,z]=walking.pos, [vx,vz]=walking.vel, s=Math.hypot(vx,vz);
+    pts=routeFrom(x,z,id);
+    const q=pts.find(p=>Math.hypot(p[0]-x,p[1]-z)>.05);
+    if(q&&s>0){ const dx=q[0]-x, dz=q[1]-z, c=(vx*dx+vz*dz)/(s*Math.hypot(dx,dz)); if(c>0) v0=s*c; }  // 길 방향 성분만 이어받는다
+    walking=null; }
+  else pts=route(at,id);
   sel=id; showInfo(); decorate();
-  const pts=route(at,id), total=plen(pts);
+  const cum=cumOf(pts), total=cum[cum.length-1];
   if(reduce||total<.5){ at=id; placeDwarf(NXZ[id][0],NXZ[id][1]); return; }
-  const cum=[0]; for(let i=1;i<pts.length;i++) cum.push(cum[i-1]+Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1]));
-  const dur=Math.max(500,Math.min(3200,total*48)), t0=performance.now(), hopLen=2.6;
-  dw.classList.remove("idle"); walking={to:id};
+  /* 1초 남짓에 닿게: 거리에 비례하되 0.35~1.4초. 빨리 갈수록 한 번에 멀리 뛴다(초당 5번쯤).
+     위치 곡선은 처음 기울기 v(이어받은 속도), 끝 기울기 0인 3차 곡선. v=0이면 부드러운 출발·도착 */
+  const dur=Math.max(350,Math.min(1400,total*22)), hopLen=Math.max(2.6,total/dur*1000*.2), t0=performance.now();
+  const v=Math.min(2.5,v0*dur/total), ease=k=>v*k+(3-2*v)*k*k+(v-2)*k*k*k;
+  dw.classList.remove("idle"); walking={to:id,pos:pts[0].slice(),vel:[0,0],t:t0};
   const step=now=>{
-    const k=Math.min(1,(now-t0)/dur), e=k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2, d=e*total;
+    const k=Math.min(1,(now-t0)/dur), d=ease(k)*total;
     let i=1; while(i<cum.length-1&&cum[i]<d) i++;
     const f=(d-cum[i-1])/((cum[i]-cum[i-1])||1), x=pts[i-1][0]+(pts[i][0]-pts[i-1][0])*f, z=pts[i-1][1]+(pts[i][1]-pts[i-1][1])*f;
+    const dt=now-walking.t; if(dt>0) walking.vel=[(x-walking.pos[0])/dt,(z-walking.pos[1])/dt]; walking.pos=[x,z]; walking.t=now;
     const a=project([pts[i-1][0],0,pts[i-1][1]]), b=project([pts[i][0],0,pts[i][1]]); dw.classList.toggle("flip",b[0]<a[0]-.01);
     const want=Math.atan2(-(pts[i][0]-pts[i-1][0]),pts[i][1]-pts[i-1][1]); DW.yaw=DW.yaw+(angTo(DW.yaw,want)-DW.yaw)*.18;
     const ph=(d/hopLen)%1, hop=Math.sin(ph*Math.PI)*.95*(1-Math.pow(1-Math.min(1,k*6),2))*(k>.97?0:1), sq=ph<.12||ph>.88?.8:0;

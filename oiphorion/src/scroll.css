@@ -18,9 +18,10 @@
   background-size:260px 260px,100% 100%,100% 100%,100% 100%;
   box-shadow:inset 0 0 60px var(--paper-edge),inset 0 10px 16px -8px rgba(0,0,0,.3),inset 0 -10px 16px -8px rgba(0,0,0,.3);
   margin:-6px 0;padding:30px clamp(16px,5vw,46px) 34px}
-.scroll.unroll .paper{animation:unroll .85s cubic-bezier(.2,.75,.2,1) both}
-.scroll.unroll .rod.t{animation:rodT .85s cubic-bezier(.2,.75,.2,1) both}
-.scroll.unroll .rod.b{animation:rodB .85s cubic-bezier(.2,.75,.2,1) both}
+/* 펼침: 서랍처럼 빠르게 열리고 부드럽게 멈춘다(iOS 서랍 곡선). 닫기는 바로 닫힌다 */
+.scroll.unroll .paper{animation:unroll .48s cubic-bezier(.32,.72,0,1) both}
+.scroll.unroll .rod.t{animation:rodT .48s cubic-bezier(.32,.72,0,1) both}
+.scroll.unroll .rod.b{animation:rodB .48s cubic-bezier(.32,.72,0,1) both}
 @keyframes unroll{from{clip-path:inset(calc(50% - 3px) 0 calc(50% - 3px) 0)}to{clip-path:inset(0 0 0 0)}}
 @keyframes rodT{from{transform:translateY(var(--half,200px))}to{transform:none}}
 @keyframes rodB{from{transform:translateY(calc(var(--half,200px) * -1))}to{transform:none}}
@@ -42,8 +43,9 @@
 .plan ol{margin:0;padding-left:1.3em;font-family:var(--f-hand);font-size:25px;line-height:1.25;color:var(--paper-ink)}
 .plan ol li::marker{color:var(--paper-red)}
 .p-view{display:flex;flex-direction:column;gap:20px;margin-top:18px}
-.p-view.enter{animation:inkin .45s ease both}
-@keyframes inkin{from{opacity:0;transform:translateY(8px);filter:blur(2px)}to{opacity:1;transform:none;filter:none}}
+/* 깊이를 바꿀 때마다 나오므로 짧게. 큰 코드 블록에 blur를 걸면 비싸서 뺐다 */
+.p-view.enter{animation:inkin .2s cubic-bezier(.23,1,.32,1) both}
+@keyframes inkin{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 .p-sec{display:flex;flex-direction:column;gap:6px;min-width:0}
 .p-sec .cap{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:4px 12px}
 .p-sec .cap b{font-family:var(--f-code);font-size:14px;color:var(--paper-blue)}
@@ -66,9 +68,10 @@
 .ar{color:var(--paper-red);font-weight:700}
 .p-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-top:6px}
 .deeper{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:10px;padding:10px 18px;border-radius:999px;font-size:15px;color:var(--paper-ink);
-  border:1.5px solid var(--paper-ink);background:linear-gradient(180deg,var(--paper-hi),var(--paper));box-shadow:0 2px 0 var(--paper-ink)}
-.deeper:hover{transform:translateY(-1px);box-shadow:0 3px 0 var(--paper-ink)}
-.deeper:active{transform:translateY(1px);box-shadow:0 1px 0 var(--paper-ink)}
+  border:1.5px solid var(--paper-ink);background:linear-gradient(180deg,var(--paper-hi),var(--paper));box-shadow:0 2px 0 var(--paper-ink);
+  transition:transform .16s cubic-bezier(.23,1,.32,1),box-shadow .16s cubic-bezier(.23,1,.32,1)}
+@media (hover:hover) and (pointer:fine){.deeper:hover{transform:translateY(-1px);box-shadow:0 3px 0 var(--paper-ink)}}
+.deeper:active{transform:translateY(1px);box-shadow:0 1px 0 var(--paper-ink);transition-duration:.06s}
 .deeper:focus-visible{outline:2px solid var(--paper-blue);outline-offset:3px}
 .ghost{all:unset;cursor:pointer;font-size:13px;color:var(--paper-ink-soft);padding:6px 8px;border-radius:6px;text-decoration:underline;text-underline-offset:3px}
 .ghost:hover{color:var(--paper-ink);background:var(--paper-mark)}

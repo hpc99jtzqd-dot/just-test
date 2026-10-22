@@ -1,4 +1,8 @@
 @media (prefers-reduced-motion:reduce){
   .bubble{display:none}
-  .scroll.unroll .paper,.scroll.unroll .rod,.p-view.enter,.dwarf.idle .wob,.node.now .ring,.stage[data-line="3"] .spur{animation:none}
+  .scroll.unroll .rod,.p-view.enter,.dwarf.idle .wob,.node.now .ring,.stage[data-line="3"] .spur{animation:none}
+  /* 움직임은 빼되 나타남은 남긴다: 두루마리는 펼치지 않고 서서히 나타난다 */
+  .scroll.unroll .paper{animation:rmfade .2s ease-out both}
+  .deeper,.go-in{transition:none}
 }
+@keyframes rmfade{from{opacity:0}to{opacity:1}}
