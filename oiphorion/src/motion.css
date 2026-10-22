@@ -1,0 +1,4 @@
+@media (prefers-reduced-motion:reduce){
+  .bubble{display:none}
+  .scroll.unroll .paper,.scroll.unroll .rod,.p-view.enter,.dwarf.idle .wob,.node.now .ring,.stage[data-line="3"] .spur{animation:none}
+}

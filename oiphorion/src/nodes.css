@@ -1,0 +1,43 @@
+/* ── 노드 라벨과 난쟁이 ── */
+#gl{position:absolute;inset:0;width:100%;height:100%;display:block;background:linear-gradient(180deg,#0d2a9c 0%,#2a62dc 30%,#7fb3f5 40%,#e8f3ff 44%,#f4f8fd 100%)}
+.stage.painting #gl{cursor:progress}
+.node{position:absolute;width:calc(var(--rx) * 2.4 + 16px);height:calc(var(--ry) * 2.8 + 24px);transform:translate(-50%,-50%);border-radius:50%;padding:0;border:0;background:none;cursor:pointer;z-index:3;font:inherit;color:inherit}
+.ring{position:absolute;left:50%;top:50%;margin:calc(var(--ry) * -1.35) 0 0 calc(var(--rx) * -1.35);width:calc(var(--rx) * 2.7);height:calc(var(--ry) * 2.7);border-radius:50%;pointer-events:none;opacity:0}
+.node.now .ring{opacity:1;border:2px solid rgba(190,255,140,.95);box-shadow:0 0 14px rgba(160,255,110,.8);animation:pulse 1.8s ease-in-out infinite}
+.node.sel .ring{opacity:1;border:2.5px solid #fff;box-shadow:0 0 0 2px rgba(18,166,214,.75),0 0 18px rgba(120,220,255,.9)}
+@keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.18);opacity:.55}}
+.tag{position:absolute;left:50%;top:calc(50% + var(--ry) + 9px);transform:translateX(-50%);white-space:nowrap;font-family:var(--f-game);font-size:13.5px;line-height:1;color:var(--ink);
+  background:linear-gradient(180deg,#fff 0%,#eef7ff 100%);border:1px solid rgba(255,255,255,.95);border-radius:999px;padding:5px 10px 4px;
+  box-shadow:0 1px 0 rgba(255,255,255,.9) inset,0 3px 10px rgba(10,40,90,.28),0 0 0 1px rgba(16,36,63,.12);pointer-events:none;display:flex;align-items:center;gap:5px}
+.tag em{font-style:normal;font-family:var(--f-code);font-size:11px;color:var(--ink-soft);font-variant-numeric:tabular-nums}
+.tag .nw{display:none;font-style:normal;font-size:10.5px;color:#fff;background:linear-gradient(180deg,var(--leaf-hi),var(--leaf));border-radius:999px;padding:2px 6px 1px}
+.node.now .tag .nw{display:inline-block}
+.node.up .tag{top:auto;bottom:calc(50% + var(--ry) + 12px)}
+.node.r .tag{transform:translateX(-85%)}
+.node.l .tag{transform:translateX(-15%)}
+.node.off .tag{opacity:.62}
+.node.sel .tag{background:linear-gradient(180deg,#5fd6f7,var(--aqua));color:#fff;border-color:#bdf0ff}
+.node.sel .tag em{color:#e6faff}
+.node:focus-visible{outline:none}
+.node:focus-visible .ring{opacity:1;border:3px solid var(--ink)}
+.spur{fill:none;stroke:#fffaf0;stroke-linecap:round;stroke-width:3.2;stroke-dasharray:.1 9;opacity:.55}
+.stage[data-line="3"] .spur{opacity:1;stroke:#fff;animation:march 1s linear infinite}
+@keyframes march{to{stroke-dashoffset:-9.1}}
+#signText{position:absolute;left:0;top:0;z-index:2;pointer-events:none;font-family:var(--f-body);font-weight:700;color:#141518;text-align:center;line-height:1.05;transform-origin:0 0;width:84px}
+#signText b{display:block;font-size:17px;letter-spacing:.02em}
+#signText span{display:block;font-size:15px;letter-spacing:.12em}
+.stage.nogl #signText{display:none}
+.dwarf{position:absolute;left:0;top:0;width:var(--w,40px);z-index:4;pointer-events:none}
+.dwarf svg{display:block;width:100%;height:auto;overflow:visible;filter:drop-shadow(0 2px 2px rgba(0,30,0,.25))}
+.dwarf .body{transform-origin:20px 47px;transform-box:view-box}
+.dwarf .wob{transform-origin:20px 47px;transform-box:view-box}
+.dwarf.idle .wob{animation:bob 1.8s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:scale(1,1)}50%{transform:scale(1.02,.975)}}
+.dwarf.flip svg{transform:scaleX(-1)}
+
+@media (max-width:899px){.tag{font-size:12px;padding:4px 8px 3px}.tag em{font-size:10px}}
+.days{display:flex;align-items:center;gap:4px;flex-wrap:nowrap}
+.days button{font-family:var(--f-game);font-size:14px;line-height:1;min-width:30px;height:30px;border-radius:999px;border:1px solid rgba(16,36,63,.16);background:linear-gradient(180deg,#fff,#e9f3fb);color:var(--ink-soft);cursor:pointer;padding:0 6px}
+.days button[aria-pressed="true"]{color:#fff;border-color:#9fe3fa;background:linear-gradient(180deg,#5fd6f7,var(--aqua) 55%,var(--aqua-deep));box-shadow:inset 0 1px 0 rgba(255,255,255,.7),0 2px 6px rgba(10,60,110,.3);text-shadow:0 1px 1px rgba(0,0,0,.25)}
+.days button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.days .sep{width:1px;height:18px;background:rgba(16,36,63,.2);margin:0 3px}

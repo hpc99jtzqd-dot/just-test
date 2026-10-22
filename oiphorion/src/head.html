@@ -1,0 +1,96 @@
+<title>오이포리온</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=Song+Myung&family=Gowun+Dodum&family=Nanum+Gothic+Coding:wght@400;700&family=Nanum+Pen+Script&display=swap">
+<style>
+/* Layout: 화면 하나가 통째로 '구름 바다 위 고원' 월드맵. 복숭앗빛 흙길을 따라 놓인 노드 = 시간 블록, 난쟁이가 걸어가고, 한 번 더 누르면 회색 두루마리.
+   한 가지 밝은 세계로만 그린다(테마 고정). */
+:root{
+  color-scheme:light;
+  --sky-top:#0d2fa8; --sky-mid:#1f56d6; --sky-low:#4d8ff0; --sky-rim:#c4e2ff;
+  --grass:#6cbf42; --grass-deep:#2f7d22; --road:#eeb69c;
+  --ink:#10243f; --ink-soft:#3d5675; --on-sky:#ffffff; --on-sky-soft:#d6e6ff;
+  --glass-hi:rgba(255,255,255,.80); --glass-lo:rgba(225,242,255,.58); --glass-edge:rgba(255,255,255,.95);
+  --glass-shine:rgba(255,255,255,.95); --shadow:rgba(10,40,110,.28);
+  --aqua:#12a6d6; --aqua-deep:#0b6d9c; --leaf:#4fb22c; --leaf-hi:#a6ee6e;
+  --node:#ffd23a; --node-deep:#c98a06; --node-rim:#5a3b06; --secret:#ff5a4a; --secret-deep:#a8231a;
+  --bubble-rim:rgba(160,220,255,.7); --bubble-core:rgba(255,255,255,.06);
+  --overlay:rgba(40,80,150,.2);
+  --paper:#dddbd5; --paper-hi:#efede8; --paper-lo:#c3c0b9; --paper-edge:rgba(70,66,58,.28);
+  --paper-ink:#24221f; --paper-ink-soft:#5a564e; --paper-red:#7b3322; --paper-blue:#2c4862;
+  --paper-teal:#2d5a55; --paper-ochre:#7a5a1c; --paper-mark:rgba(58,55,49,.10); --paper-rule:rgba(58,55,49,.07);
+  --paper-hl:rgba(196,110,60,.16); --rod:#7a736a; --rod-hi:#c9c2b6; --rod-lo:#4a453e;
+  --f-game:"Jua","Gowun Dodum","Apple SD Gothic Neo",sans-serif;
+  --f-display:"Song Myung","Nanum Myeongjo",serif;
+  --f-body:"Gowun Dodum","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --f-code:"Nanum Gothic Coding","D2Coding",ui-monospace,monospace;
+  --f-hand:"Nanum Pen Script","Gowun Dodum",cursive;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:linear-gradient(180deg,var(--sky-top) 0 45%,var(--grass-deep) 45% 100%);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.55}
+.bubbles{position:fixed;inset:0;z-index:6;pointer-events:none;overflow:hidden}
+.bubble{position:absolute;bottom:-80px;border-radius:50%;
+  background:radial-gradient(circle at 32% 28%,rgba(255,255,255,.95) 0 7%,rgba(255,255,255,.3) 15%,var(--bubble-core) 48%,var(--bubble-rim) 80%,rgba(255,255,255,.75) 96%,transparent 100%);
+  animation:rise var(--d) linear var(--delay) infinite}
+@keyframes rise{from{transform:translate(0,0)}25%{transform:translate(14px,-30vh)}50%{transform:translate(-10px,-60vh)}75%{transform:translate(12px,-90vh)}to{transform:translate(0,-125vh)}}
+
+.world{position:relative}
+.stage{position:relative;width:100%;overflow:hidden;touch-action:manipulation}
+#trail{position:absolute;inset:0;width:100%;height:100%;display:block;pointer-events:none;z-index:2;overflow:visible}
+
+/* ── 머리말 ── */
+.head{display:flex;flex-direction:column;gap:8px;color:var(--on-sky);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:24px 18px}
+.eyebrow{font-size:12px;letter-spacing:.14em;color:var(--on-sky-soft)}
+h1{font-family:var(--f-game);font-weight:400;font-size:clamp(30px,3.7vw,54px);line-height:1.05;margin:0;text-wrap:balance;
+  background:linear-gradient(180deg,#ffffff 45%,#cfe8ff 55%,#ffffff);-webkit-background-clip:text;background-clip:text;color:transparent;
+  filter:drop-shadow(0 2px 0 rgba(8,30,110,.55)) drop-shadow(0 0 18px rgba(170,215,255,.6))}
+.lead{margin:0;font-size:14.5px;color:var(--on-sky-soft);max-width:30em}
+.glass{position:relative;background:linear-gradient(180deg,var(--glass-hi),var(--glass-lo));border:1px solid var(--glass-edge);
+  -webkit-backdrop-filter:blur(14px) saturate(160%);backdrop-filter:blur(14px) saturate(160%);
+  box-shadow:inset 0 1px 0 var(--glass-shine),0 12px 30px var(--shadow)}
+.signpost{border-radius:22px;padding:10px 12px 10px 16px;display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;align-self:flex-start;max-width:100%;margin-top:4px;color:var(--ink)}
+.field{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-soft)}
+.field input{font-family:var(--f-code);font-size:15px;color:var(--ink);background:#fff;border:1px solid rgba(16,36,63,.18);
+  border-radius:999px;padding:4px 10px;font-variant-numeric:tabular-nums;min-width:0}
+.field input:focus-visible{outline:2px solid var(--aqua);outline-offset:2px}
+.field small{font-size:11px}
+.route{display:inline-flex;align-items:center;gap:8px;border-radius:999px;padding:5px 14px 5px 10px;font-size:14px;color:#fff;font-family:var(--f-game);
+  background:linear-gradient(180deg,#3cc3ec,var(--aqua-deep));box-shadow:inset 0 1px 0 rgba(255,255,255,.6),0 3px 10px var(--shadow);text-shadow:0 1px 1px rgba(0,0,0,.3)}
+.route[data-line="2"]{background:linear-gradient(180deg,#f4b84a,#b5700e)}
+.route[data-line="3"]{background:linear-gradient(180deg,#ff7a62,#b8301f)}
+.route svg{width:18px;height:18px}
+
+/*@NODES_CSS@*/
+/* ── 레벨 안내판 ── */
+.info{border-radius:24px;padding:16px 18px 16px;display:flex;flex-direction:column;gap:8px;color:var(--ink);
+  margin:16px max(16px,env(safe-area-inset-right,0px)) 0 max(16px,env(safe-area-inset-left,0px))}
+.info::before{content:"";position:absolute;left:5%;right:5%;top:2px;height:42%;border-radius:22px 22px 60% 60%/22px 22px 24px 24px;
+  background:linear-gradient(180deg,rgba(255,255,255,.9),transparent);pointer-events:none}
+.i-top{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;font-size:12.5px;color:var(--ink-soft);position:relative;font-variant-numeric:tabular-nums}
+.i-top .chip{font-size:11px;border-radius:999px;padding:2px 9px;color:#fff;background:linear-gradient(180deg,var(--leaf-hi),var(--leaf));text-shadow:0 1px 1px rgba(0,0,0,.25)}
+.i-top .chip.off{background:none;color:var(--ink-soft);border:1px dashed var(--ink-soft);text-shadow:none}
+.i-name{font-family:var(--f-game);font-weight:400;font-size:30px;line-height:1.05;margin:0;position:relative}
+.i-todo{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:3px;position:relative}
+.i-todo li{padding-left:16px;position:relative;font-size:14.5px;line-height:1.45}
+.i-todo li::before{content:"";position:absolute;left:2px;top:.55em;width:8px;height:8px;border-radius:50%;
+  background:radial-gradient(circle at 35% 30%,#fff 0 20%,var(--aqua) 60%,var(--aqua-deep))}
+.i-todo li.extra{color:var(--aqua-deep);font-weight:700}
+.go-in{align-self:flex-start;margin-top:4px;cursor:pointer;border:0;font-family:var(--f-game);font-size:16px;color:#fff;border-radius:999px;padding:9px 18px 8px;
+  background:linear-gradient(180deg,#5fd6f7 0%,var(--aqua) 50%,var(--aqua-deep) 100%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.8),inset 0 -2px 4px rgba(0,40,80,.3),0 4px 12px var(--shadow);text-shadow:0 1px 1px rgba(0,0,0,.3)}
+.go-in:hover{filter:brightness(1.06)}
+.go-in:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
+.i-hint{margin:0;font-size:12px;color:var(--ink-soft);position:relative}
+.foot{font-size:12px;color:#e3f5d6;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:18px 28px;max-width:62em}
+
+@media (min-width:900px){
+  .head{position:absolute;z-index:5;top:0;left:0;max-width:min(46%,560px);padding-block:clamp(20px,4vh,40px) 0;padding-left:max(28px,env(safe-area-inset-left,0px))}
+  .info{position:absolute;z-index:5;top:clamp(20px,4vh,40px);right:max(24px,env(safe-area-inset-right,0px));width:310px;margin:0}
+  .i-name{font-size:28px}
+}
+/*@SCROLL_CSS@*/
+/*@MOTION_CSS@*/
+</style>
