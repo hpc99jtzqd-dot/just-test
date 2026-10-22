@@ -4,7 +4,8 @@ const toMin = s=>{const m=/^(\d{1,2}):(\d{2})/.exec(s||"");return m?(+m[1])*60+(
 const hhmm = m=>{m=((m%1440)+1440)%1440;return String(Math.floor(m/60)).padStart(2,"0")+":"+String(m%60).padStart(2,"0")};
 const store = {get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
 const wakeEl=document.getElementById("wake"), wokeEl=document.getElementById("woke");
-{ const a=store.get("dw.wake"); if(a) wakeEl.value=a; const b=store.get("dw.woke"); if(b) wokeEl.value=b; }
+{ const a=store.get("dw.wake"); if(a) wakeEl.value=a; }
+const todayDow=()=>new Date(JOURNEY.todayKey()+"T00:00:00Z").getUTCDay();
 function decideLine(woke,wake){ if(woke<=wake) return 1; if(woke<=wake+120) return 2; return 3; }
 const ROUTE = {1:["큰길","1선 · 정상"],2:["샛길","2선 · 늦잠"],3:["오솔길","3선 · 크게 늦음"]};
 const ROUTE_SCHOOL = {1:["큰길","여유 아침"],2:["샛길","빠듯한 아침"],3:["오솔길","출발 시각 지남"]};
@@ -17,13 +18,13 @@ const MAIN = ["dawn","morning","lunch","afternoon","evening","hobby","closing","
 const NODE_ORDER = ["dawn","morning","lunch","afternoon","evening","hobby","closing","camp","sunday","minimum"];
 const byId = id=>ALL.find(b=>b.id===id);
 let state={W:450,line:1};
-let dayIdx=new Date().getDay(), PLAN=BLOCKS;
+let dayIdx=todayDow(), PLAN=BLOCKS;
 const planOf=d=>PLANS[d]||PLANS.free;
 function setDay(d){ dayIdx=d; PLAN=planOf(d); ALL=[...PLAN,...WEEKLY]; document.querySelectorAll('#days button').forEach(b=>b.setAttribute('aria-pressed',String(+b.dataset.d===d))); }
 function blockTime(b){ if(!b.when) return b.whenLabel; const [s,e]=b.when(state.W); if(b.id==="morning"&&s>=e) return "오전 없음"; return hhmm(s)+" – "+hhmm(e); }
 function isOff(b){ if(b.id==="morning"&&!b.fixed){ const [s,e]=b.when(state.W); if(s>=e) return true; } return !!(b.lines&&!b.lines.includes(state.line)); }
-function nowId(){ const d=new Date(), n0=d.getHours()*60+d.getMinutes();
-  if(new Date().getDay()!==dayIdx) return null;
+function nowId(){ const d=new Date(Date.now()+9*36e5), n0=d.getUTCHours()*60+d.getUTCMinutes();
+  if(todayDow()!==dayIdx) return null;
   for(const b of PLAN){ if(b.only3&&state.line!==3) continue; if(isOff(b)) continue; const [s,e]=b.when(state.W); const n=(b.id==="camp"&&n0<state.W)?n0+1440:n0; if(n>=s&&n<e) return b.id; }
   return null; }
 
@@ -580,6 +581,8 @@ function decorate(){
    픽셀마다 결과가 정해져 있어서 이어 붙인 자리에 이음매가 생기지 않는다. */
 const reduce=matchMedia("(prefers-reduced-motion: reduce)").matches;
 const DW_S=1.25, DW={x:0,y:0,z:0,yaw:0,goal:null,hop:0,sq:0,bounce:0,on:false,dirty:false,drawn:null};
+let maxHop=0;
+window.__dw=Object.freeze({get hat(){return !hatLost()},get tramp(){return trampMode()},get feet(){return feetMode()},get walking(){return !!walking},get hop(){return DW.hop},get maxHop(){return maxHop}});
 /* 갈림길과 한 주 기록에 따라 난쟁이가 달라진다(명세 규칙 4·5).
    2선: 서두르다 모자를 잃는다. 그날은 하루 종일 모자 없이 다니고(되찾기 없음), 잃은 모자는
         수업 없는 날엔 꺼진 오전 칸 옆, 수업 날엔 집(출발) 옆에 놓여 있다. 다음 날 아침엔 새 모자.
@@ -588,11 +591,15 @@ const DW_S=1.25, DW={x:0,y:0,z:0,yaw:0,goal:null,hop:0,sq:0,bounce:0,on:false,di
    한 주 기록(JOURNEY)은 보고 있는 요일이 오늘일 때만 쓴다. 다른 요일 버튼은 갈림길만 보고 그린다. */
 const hatSpot=()=>PLAN.leave?"dawn":"morning";
 const hatLost=()=>state.line===2;
-const todayDow=()=>new Date(JOURNEY.todayKey()+"T00:00:00Z").getUTCDay();
 const isToday=()=>dayIdx===todayDow();
+const selectedDate=()=>{
+  const today=JOURNEY.todayKey(), date=new Date(today+"T00:00:00Z");
+  date.setUTCDate(date.getUTCDate()+(dayIdx+6)%7-(todayDow()+6)%7);
+  return date.toISOString().slice(0,10);
+};
 /* "back"(등에 멤) | "feet"(발밑, 오늘 망가짐) | "none"(그 주에 이미 잃음) */
 function trampMode(){
-  if(isToday()&&JOURNEY.trampolineFor()==="gone") return "none";
+  if(JOURNEY.trampolineFor(selectedDate())==="gone") return "none";
   return state.line===3?"feet":"back";  // 기록이 아직 저장 전이어도 오늘 3선이면 오늘 망가지는 날이다
 }
 const feetMode=()=>trampMode()==="feet";
@@ -639,8 +646,9 @@ const angTo=(a,b)=>a+Math.atan2(Math.sin(b-a),Math.cos(b-a));
 /* 가만히 있을 땐 카메라 쪽을 보되, 등의 트램펄린이 보이게 비스듬히 선다 */
 const idleYaw=(x,z)=>Math.atan2(-(CAM.ro[0]-x),CAM.ro[2]-z)+.6;
 function placeDwarf(x,z,hop,squash,yaw){
-  if(!gl){ placeDwarfSVG(x,z,hop,squash); return; }
   DW.x=x; DW.z=z; DW.y=feetY(x,z); DW.hop=hop||0; DW.sq=squash||0; DW.on=true;
+  maxHop=Math.max(maxHop,DW.hop);
+  if(!gl){ placeDwarfSVG(x,z,hop,squash); return; }
   if(yaw===undefined){ DW.goal=angTo(DW.yaw,idleYaw(x,z)); if(reduce||!DW.drawn) DW.yaw=DW.goal; } else { DW.goal=null; DW.yaw=yaw; }
   drawDwarf();
 }
@@ -699,6 +707,7 @@ function walkTo(id){
      위치 곡선은 처음 기울기 v(이어받은 속도), 끝 기울기 0인 3차 곡선. v=0이면 부드러운 출발·도착 */
   const fm=feetMode(), dur=Math.max(fm?600:350,Math.min(fm?1800:1400,total*(fm?28:22))), hopLen=Math.max(fm?6:2.6,total/dur*1000*(fm?.4:.2)), hopH=fm?2.6:.95, t0=performance.now();
   const v=Math.min(2.5,v0*dur/total), ease=k=>v*k+(3-2*v)*k*k+(v-2)*k*k*k;
+  maxHop=0;
   dw.classList.remove("idle"); walking={to:id,pos:pts[0].slice(),vel:[0,0],t:t0};
   const step=now=>{
     const k=Math.min(1,(now-t0)/dur), d=ease(k)*total;
@@ -744,17 +753,31 @@ document.getElementById("enter").addEventListener("click",()=>openScroll(sel,doc
 function refresh(rerender){
   const W=toMin(wakeEl.value)??450, woke=toMin(wokeEl.value)??W, line=computeLine(W,woke), changed=line!==state.line;
   state={W,line};
-  dw.classList.toggle("no-hat",hatLost()); dw.classList.toggle("no-tramp",trampMode()==="none");  // WebGL 없을 때의 SVG 난쟁이
-  const r=document.getElementById("route"); r.dataset.line=line; r.innerHTML=signSVG+"<span>"+routeOf(line)[0]+" · "+routeOf(line)[1]+"</span>";
+  dw.dataset.hat=hatLost()?"0":"1"; dw.dataset.tramp=trampMode();
+  const r=document.getElementById("route"); r.dataset.line=line; r.innerHTML=signSVG+"<span>"+routeOf(line)[0]+" · "+routeOf(line)[1]+(wokeEl.value?"":" · 아직 안 적음")+"</span>";
   buildOverlay(); decorate(); showInfo();
   if(rerender||changed) render();
 }
 /* 오늘 요일을 보고 있을 때 '오늘 일어난 시각'을 고치면 오늘 기록으로 남긴다(타자 중엔 0.8초 기다렸다가) */
 let recT=0;
-[wakeEl,wokeEl].forEach(el=>el.addEventListener("input",()=>{ store.set("dw.wake",wakeEl.value); store.set("dw.woke",wokeEl.value); refresh(false);
-  if(el===wokeEl&&isToday()&&toMin(wokeEl.value)!==null){ clearTimeout(recT); recT=setTimeout(()=>{ if(isToday()&&toMin(wokeEl.value)!==null) Promise.resolve(JOURNEY.recordToday(wokeEl.value,state.line)).catch(e=>console.error(e)); },800); } }));
+[wakeEl,wokeEl].forEach(el=>el.addEventListener("input",()=>{ store.set("dw.wake",wakeEl.value); refresh(false);
+  if(el===wokeEl){ clearTimeout(recT); recT=0; }
+  if(el===wokeEl&&isToday()&&toMin(wokeEl.value)!==null){ const key=JOURNEY.todayKey(); recT=setTimeout(()=>{ recT=0; if(key===JOURNEY.todayKey()&&isToday()&&toMin(wokeEl.value)!==null) Promise.resolve(JOURNEY.recordToday(wokeEl.value,state.line)).catch(e=>console.error(e)); },800); } }));
+/* db 로드/기록 때 갱신되는 날짜별 캐시에서 선택한 날의 값을 읽는다.
+   오늘만 입력 가능하며, 날짜가 바뀌면 포커스 중이어도 이전 값을 지운다. */
+let wokeDate=JOURNEY.todayKey();
+function restoreTodayWake(){
+  const key=selectedDate(), changed=key!==wokeDate;
+  if(changed){ clearTimeout(recT); recT=0; wokeDate=key; wokeEl.value=""; }
+  wokeEl.disabled=!isToday();
+  if(!changed&&isToday()&&(recT||document.activeElement===wokeEl)) return;
+  let rec=null;
+  try { rec=JSON.parse(store.get("oi.journey.days")||"{}")[key]; } catch(e) {}
+  wokeEl.value=rec&&[1,2,3].includes(rec.line)&&toMin(rec.woke)!==null?rec.woke:"";
+}
 /* 한 주 기록·맵이 바뀌면: 맵이 바뀌었으면 풍경을 다시 그리고, 아니면 난쟁이만(트램펄린 상태) 다시 그린다 */
 function applyJourney(){
+  restoreTodayWake();
   const m=Math.max(1,Math.min(MAP_THEMES.length,+JOURNEY.progress().map||1)), mapChanged=m!==mapNo; mapNo=m;
   refresh(mapChanged); if(!mapChanged) drawDwarf();
 }
@@ -767,14 +790,23 @@ function layoutAll(){
   refresh(true); placeDwarf(NXZ[at][0],NXZ[at][1]);
 }
 (function init(){
-  const W=toMin(wakeEl.value)??450, woke=toMin(wokeEl.value)??W; state={W,line:decideLine(woke,W)};
   setDay(dayIdx);
-  document.getElementById("days").addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b) return; setDay(+b.dataset.d); if(walking){ cancelAnimationFrame(walking.raf); at=walking.to; walking=null; dw.classList.add("idle"); } refresh(true); placeDwarf(NXZ[at][0],NXZ[at][1]); });
+  restoreTodayWake();
+  const W=toMin(wakeEl.value)??450, woke=toMin(wokeEl.value)??W; state={W,line:computeLine(W,woke)};
+  document.getElementById("days").addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b) return; setDay(+b.dataset.d); restoreTodayWake(); if(walking){ cancelAnimationFrame(walking.raf); at=walking.to; walking=null; dw.classList.add("idle"); } refresh(true); placeDwarf(NXZ[at][0],NXZ[at][1]); });
   const h=location.hash.slice(1), n=nowId(); at=sel=(h&&NXZ[h])?h:(n||"dawn");
   initGL(); layoutAll();
   let to,lastW=VW.W; window.addEventListener("resize",()=>{ clearTimeout(to); to=setTimeout(()=>{ if(Math.abs(stageEl.clientWidth-lastW)>2){ lastW=stageEl.clientWidth; layoutAll(); } },180); });
-  setInterval(()=>{ decorate(); if(!walking) showInfo(); },60000);
-  JOURNEY.ready.then(()=>{ applyJourney(); JOURNEY.onChange(applyJourney); }).catch(e=>console.error(e));  // 처음엔 기록 없이 그리고, 준비되면 다시
+  let calendarDate=JOURNEY.todayKey();
+  const updateCalendar=()=>{
+    if(calendarDate===JOURNEY.todayKey()) return;
+    calendarDate=JOURNEY.todayKey(); setDay(todayDow()); applyJourney();
+  };
+  document.addEventListener("visibilitychange",updateCalendar);
+  setInterval(()=>{ updateCalendar(); decorate(); if(!walking) showInfo(); },60000);
+  JOURNEY.ready.then(()=>{ applyJourney(); JOURNEY.onChange(applyJourney);
+    const ready=()=>{ if(gl&&!raster.done){ requestAnimationFrame(ready); return; } window.__journeyReady=true; }; ready();
+  }).catch(e=>console.error(e));  // db 처리와 첫 렌더가 끝나면 시험용 준비 신호
 })();
 
 /* ───── 비눗방울 ───── */

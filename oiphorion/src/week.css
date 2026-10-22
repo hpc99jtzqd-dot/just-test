@@ -35,6 +35,11 @@
 .wk-status{margin:0;padding:9px 14px;border-radius:14px;background:linear-gradient(180deg,var(--glass-hi),var(--glass-lo));border:1px solid var(--glass-edge);color:var(--ink);font-size:14px;line-height:1.5}
 .wk-status b{font-family:var(--f-game);font-weight:400}
 body.wk-on #info,body.wk-on .stage .dwarf{display:none}
+/* 데스크톱의 절대 배치 머리말은 주간 패널 위에서 계속 조작할 수 있어야 한다. */
+@media (min-width:900px){
+  body.wk-on .head{z-index:7}
+  body.wk-on .wk-in{width:54%;margin-right:0}
+}
 
 /* 일요일 점프 연출: transform/opacity만 */
 .wk-jump{position:absolute;inset:0;z-index:9;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:linear-gradient(180deg,#0d2fa8 0%,#2a62dc 55%,#a9d0ff 100%);animation:wk-fadein .3s ease-out both}

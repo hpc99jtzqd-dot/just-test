@@ -4,3 +4,4 @@ study_os
 study_os.dat
 *.png
 !refs/*.png
+!shots/*.png

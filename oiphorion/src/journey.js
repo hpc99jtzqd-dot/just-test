@@ -10,7 +10,7 @@
      { monday, practice, weekNo, days:[{key, dow, line, inferred, future, hatLost, trampolineBreaks}],
        hatsLost, trampolineLostOn, trampolineAlive, result: "pending"|"advance"|"stay" }
      dow는 JS getDay 규칙(월 1 … 토 6). days는 월~토 6개
-   JOURNEY.trampolineFor(key?)        "intact" | "breaks-today" | "gone"
+   JOURNEY.trampolineFor(key?)        "intact" | "breaks-today"(첫 3선 당일) | "gone"
    JOURNEY.progress()                 { map: 1..5, round: 1.., pendingJump: {monday, result, ending} | null }
    JOURNEY.markJumpSeen()             Promise. pendingJump를 본 것으로
    JOURNEY.onChange(fn)               기록이나 진행이 바뀌면 fn() 호출
@@ -157,8 +157,10 @@ const JOURNEY = (() => {
 
     trampolineFor(key) {
       key = key || todayKey();
-      const lost = api.week(key).trampolineLostOn;
-      return lost == null || key < lost ? "intact" : key === lost ? "breaks-today" : "gone";
+      const week = api.week(key), lost = week.trampolineLostOn;
+      if (lost == null || key < lost) return "intact";
+      // 발밑에 깔고 튀는 연출은 처음 3선인 당일뿐. 두 번째 2선은 즉시 없어진다.
+      return key === lost && week.days.find(d => d.key === lost).line === 3 ? "breaks-today" : "gone";
     },
 
     progress() {

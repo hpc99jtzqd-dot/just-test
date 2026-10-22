@@ -34,7 +34,10 @@
 .dwarf.idle .wob{animation:bob 1.8s ease-in-out infinite}
 @keyframes bob{0%,100%{transform:scale(1,1)}50%{transform:scale(1.02,.975)}}
 .dwarf.flip svg{transform:scaleX(-1)}
-.dwarf.no-hat .wob>:nth-last-child(-n+3),.dwarf.no-tramp .wob>g:first-child{display:none}  /* SVG 난쟁이: 2선 맨머리, 트램펄린 잃은 주 */
+.dwarf .dw-feet{display:none}
+.dwarf[data-hat="0"] .dw-hat{display:none}
+.dwarf[data-tramp="none"] .dw-tramp,.dwarf[data-tramp="feet"] .dw-tramp{display:none}
+.dwarf[data-tramp="feet"] .dw-feet{display:inline}
 
 @media (max-width:899px){.tag{font-size:12px;padding:4px 8px 3px}.tag em{font-size:10px}}
 .days{display:flex;align-items:center;gap:6px;flex-wrap:nowrap}
