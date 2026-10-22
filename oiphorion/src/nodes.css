@@ -31,6 +31,7 @@
 .dwarf svg{display:block;width:100%;height:auto;overflow:visible;filter:drop-shadow(0 2px 2px rgba(0,30,0,.25))}
 .dwarf .body{transform-origin:20px 47px;transform-box:view-box}
 .dwarf .wob{transform-origin:20px 47px;transform-box:view-box}
+.dwarf .dw-boy{stroke-linecap:round;stroke-linejoin:round}
 .dwarf.idle .wob{animation:bob 1.8s ease-in-out infinite}
 @keyframes bob{0%,100%{transform:scale(1,1)}50%{transform:scale(1.02,.975)}}
 .dwarf.flip svg{transform:scaleX(-1)}

@@ -231,15 +231,37 @@ vec2 dwarf(vec3 p){
   float b=length(q-vec3(0.,2.1,-.2))-2.7; if(b>.3) return vec2(b*k,20.);
   float fm=uDw3.y;vec3 qb=q-vec3(0.,fm*.42+uDw3.z,0.);  // 3선: 발밑 트램펄린 위로 몸을 올린다
   vec3 m=vec3(abs(qb.x),qb.yz);
-  float d=sdCapCone(qb-vec3(0.,.8,0.),.74,.7,.42)-.07,id=20.;
-  float arm=sdCap(m,vec3(.3,1.42,0.),vec3(.58,1.08,.18),.13);d=smin(d,arm,.1);
-  float t=length(m-vec3(.62,1.04,.22))-.19;if(t<d){d=t;id=24.;}
-  t=sdEll(m-vec3(.24,.07,.22),vec3(.16,.1,.24));if(t<d){d=t;id=27.;}
-  t=length(qb-vec3(0.,1.92,.06))-.4;if(t<d){d=t;id=22.;}
-  t=length(qb-vec3(0.,1.93,.47))-.12;if(t<d){d=t;id=22.;}
-  t=sdEll(qb-vec3(0.,1.5,.28),vec3(.43,.46,.28));if(t<d){d=t;id=23.;}
-  if(uDw3.x>.5){vec3 h=qb;h.z+=(h.y-2.15)*.22;  // 모자 끝이 뒤로 휜다
-    t=sdCone(h-vec3(0.,3.3,-.06),vec2(.4,.917),1.1);t=smin(t,sdEll(qb-vec3(0.,2.24,-.03),vec3(.47,.14,.47)),.08);if(t<d){d=t;id=21.;}}
+  // 약 2.8등신 소년: 가는 두 바짓단과 둥근 어깨의 짧은 블레이저.
+  float d=sdBox(qb-vec3(0.,1.36,0.),vec3(.29,.39,.19))-.065,id=20.;
+  float arm=sdCap(m,vec3(.31,1.67,0.),vec3(.45,1.02,.08),.115);d=smin(d,arm,.06);
+  float t=sdCap(m,vec3(.18,.85,0.),vec3(.19,.23,.035),.12);if(t<d){d=t;id=27.;}
+  t=sdEll(m-vec3(.19,.12,.12),vec3(.16,.12,.27));if(t<d){d=t;id=27.;}
+  t=sdCap(m,vec3(.45,1.02,.08),vec3(.46,.94,.095),.119);if(t<d){d=t;id=23.;}
+  t=sdEll(m-vec3(.465,.84,.1),vec3(.125,.15,.115));if(t<d){d=t;id=22.;}
+  // 조끼의 V 절개 뒤로 흰 셔츠가 보이고, 깃 두 장이 목을 감싼다.
+  t=sdBox(qb-vec3(0.,1.38,.225),vec3(.22,.34,.04))-.025;
+  t=max(t,qb.y-1.43-abs(qb.x)*1.35);if(t<d){d=t;id=24.;}
+  t=sdEll(qb-vec3(0.,1.73,.24),vec3(.19,.23,.055));if(t<d){d=t;id=23.;}
+  t=sdCap(qb,vec3(0.,1.77,0.),vec3(0.,1.98,0.),.14);if(t<d){d=t;id=22.;}
+  t=sdCap(m,vec3(.09,1.86,.25),vec3(.16,1.7,.29),.06);if(t<d){d=t;id=23.;}
+  // 각진 라펠, 단추 두 개, 작은 붉은 나비넥타이.
+  t=sdCap(m,vec3(.27,1.77,.205),vec3(.18,1.43,.27),.065);if(t<d){d=t;id=20.;}
+  t=min(length(qb-vec3(.235,1.28,.267)),length(qb-vec3(.235,1.06,.267)))-.045;if(t<d){d=t;id=27.;}
+  t=sdEll(m-vec3(.09,1.755,.338),vec3(.095,.075,.045));
+  t=min(t,length(qb-vec3(0.,1.755,.35))-.05);if(t<d){d=t;id=23.;}
+  // 둥근 얼굴, 작은 귀와 코. 수염 없이 짧은 갈색 머리를 드러낸다.
+  t=sdEll(qb-vec3(0.,2.43,.025),vec3(.56,.585,.48));if(t<d){d=t;id=22.;}
+  t=sdEll(m-vec3(.55,2.37,.015),vec3(.105,.15,.1));if(t<d){d=t;id=22.;}
+  t=sdEll(qb-vec3(0.,2.34,.505),vec3(.075,.085,.085));if(t<d){d=t;id=22.;}
+  t=sdEll(m-vec3(.21,2.5,.477),vec3(.073,.112,.035));if(t<d){d=t;id=27.;}
+  t=sdEll(qb-vec3(0.,2.75,-.055),vec3(.575,.31,.475));
+  t=min(t,sdEll(qb-vec3(-.26,2.79,.36),vec3(.27,.19,.12)));
+  t=min(t,sdEll(qb-vec3(.13,2.84,.39),vec3(.24,.14,.1)));
+  t=min(t,sdEll(m-vec3(.49,2.58,-.025),vec3(.075,.22,.27)));if(t<d){d=t;id=24.;}
+  if(uDw3.x>.5){  // 둥글게 부푼 뉴스보이 캡과 앞으로만 나온 짧은 챙.
+    t=sdEll(qb-vec3(-.035,3.025,-.055),vec3(.64,.285,.54));
+    t=smin(t,sdEll(qb-vec3(0.,2.86,.015),vec3(.565,.065,.49)),.025);
+    t=min(t,sdEll(qb-vec3(0.,2.88,.455),vec3(.5,.055,.285)));if(t<d){d=t;id=21.;}}
   if(uDw3.w>.5){}  // 그 주에 트램펄린을 잃었다: 등에도 발밑에도 없다
   else if(fm<.5){vec3 r=trLocal(qb);  // 등에 멘 트램펄린
     t=length(vec2(length(r.xy)-.95,r.z))-.1;if(t<d){d=t;id=26.;}
@@ -252,10 +274,12 @@ vec2 dwarf(vec3 p){
     vec3 l4=vec3(abs(q.x),q.y,abs(q.z));t=sdCap(l4,vec3(.63,.3,.63),vec3(.7,0.,.7),.05);if(t<d){d=t;id=27.;}}
   return vec2(d*k,id);
 }
-/* 잃어버린 모자: 풀밭에 옆으로 누워 있다 */
-float lostHat(vec3 p){vec3 q=(p-uHat.xyz)/uDw2.x;float b=length(q-vec3(.6,0.,0.))-1.3;if(b>.3)return b*uDw2.x;
-  vec3 h=vec3(-q.y,q.x,q.z);h.z+=h.y*.12;
-  float t=sdCone(h-vec3(0.,1.15,0.),vec2(.4,.917),1.1);t=smin(t,sdEll(h-vec3(0.,.07,0.),vec3(.47,.14,.47)),.08);return t*uDw2.x;}
+/* 잃어버린 모자: 동일한 파란 캡을 풀밭에 살짝 기울여 놓는다. */
+float lostHat(vec3 p){vec3 q=(p-uHat.xyz)/uDw2.x;float b=length(q-vec3(.15,0.,.1))-.95;if(b>.3)return b*uDw2.x;
+  vec3 h=rotY(q,.65);h=vec3(.94*h.x-.342*h.y,.342*h.x+.94*h.y,h.z);
+  float t=sdEll(h-vec3(-.035,.04,-.055),vec3(.64,.285,.54));
+  t=smin(t,sdEll(h-vec3(0.,-.125,.015),vec3(.565,.065,.49)),.025);
+  t=min(t,sdEll(h-vec3(0.,-.105,.455),vec3(.5,.055,.285)));return t*uDw2.x;}
 vec2 obj(vec3 p){
   float d=1e5,id=0.;
   for(int i=0;i<10;i++){vec3 q=p-uNodes[i].xyz;float b=length(q)-1.7;float dd=b>.4?b:sdNode(q);if(dd<d){d=dd;id=10.+float(i);}}
@@ -289,7 +313,7 @@ float shadow(vec3 p,float withDw){
   for(int i=0;i<10;i++){vec3 oc=uNodes[i].xyz-p;float b=dot(oc,uL);if(b>0.&&b<6.){float dd=length(oc-uL*b)-1.4;res=min(res,clamp(.4+dd*3.,0.,1.));}}
   if(withDw>.5&&uDw2.z>.5){float s=uDw2.x;
     for(int i=0;i<4;i++){vec3 c;float r;
-      if(i==0){c=vec3(0.,.55,0.);r=.62;}else if(i==1){c=vec3(0.,1.45,.05);r=.5;}else if(i==2){c=vec3(0.,2.45,-.1);r=.38;}else{c=mix(vec3(0.,1.35,-.74),vec3(0.,.32,0.),uDw3.y);r=.88;}
+      if(i==0){c=vec3(0.,.5,.04);r=.32;}else if(i==1){c=vec3(0.,1.39,.02);r=.4;}else if(i==2){c=vec3(0.,2.53,-.015);r=uDw3.x>.5?.62:.55;}else{c=mix(vec3(0.,1.35,-.74),vec3(0.,.32,0.),uDw3.y);r=.88;}
       if(i<3)c.y+=uDw3.y*.42+uDw3.z;else if(uDw3.w>.5)break;
       vec3 oc=uDw.xyz+rotY(c*s,uDw.w)-p;float b=dot(oc,uL);if(b>0.){float dd=length(oc-uL*b)-r*s;res=min(res,clamp(.3+dd*2.2,0.,1.));}}}
   return clamp(res,0.,1.);
@@ -357,7 +381,7 @@ vec3 shadeGround(vec3 p,vec3 rd,float t){
   for(int i=0;i<10;i++){float d=length(p.xz-uNodes[i].xz);ao*=mix(.45,1.,smoothstep(1.2,2.6,d));}
   for(int i=0;i<24;i+=3){vec4 tr=uTrees[i];float d=length(p.xz-tr.xz);ao*=mix(.5,1.,smoothstep(tr.w*.4,tr.w*1.9,d));}
   ao*=mix(.55,1.,smoothstep(-6.,0.,s+2.));
-  if(uHat.w>.5)ao*=mix(.6,1.,smoothstep(.3,1.5,length(p.xz-uHat.xz-vec2(.6*uDw2.x,0.))));
+  if(uHat.w>.5)ao*=mix(.6,1.,smoothstep(.3,1.5,length(p.xz-uHat.xz-vec2(.15*uDw2.x,.1*uDw2.x))));
   if(uDw2.z>.5){float dd=length(p.xz-uDw.xz)/uDw2.x;ao*=mix(mix(.42,.9,clamp(uDw2.w*.7,0.,1.)),1.,smoothstep(.35,1.3,dd));}
   float dif=max(dot(n,uL),0.)*shadow(p+n*.08,1.);
   vec3 col=alb*(SUN*dif+AMB*(.55+.45*n.y)*ao+lin(vec3(.5,.62,.4))*.12*max(-n.y,0.));
@@ -388,20 +412,31 @@ vec3 shadeObj(vec3 p,vec3 rd,float id,float t){
   vec3 ref=reflect(rd,n);float fre=pow(1.-max(dot(n,-rd),0.),5.);
   if(id>=19.5){
     vec3 q0=dwLocal(p),q=q0-vec3(0.,uDw3.y*.42+uDw3.z,0.);
-    if(id<20.5){alb=lin(vec3(.80,.27,.17));
-      float belt=step(abs(q.y-.8),.07);alb=mix(alb,lin(vec3(.29,.14,.07)),belt);
-      if(abs(q.y-.8)<.1&&abs(q.x)<.1&&q.z>0.){alb=lin(vec3(.97,.80,.30));spec=.8;gloss=60.;}
-      alb*=.9+.1*smoothstep(0.,1.6,q.y);}
-    else if(id<21.5){alb=lin(vec3(.90,.17,.12));spec=.25;gloss=20.;}
-    else if(id<22.5){alb=lin(vec3(.98,.80,.66));
-      vec3 e=vec3(abs(q.x)-.15,q.y-2.04,q.z-.4);if(q.z>0.&&length(e)<.065)alb=lin(vec3(.12,.1,.12));
-      if(length(q-vec3(0.,1.93,.47))<.13)alb=lin(vec3(1.,.64,.54));}
-    else if(id<23.5){alb=lin(vec3(.97,.96,.93))*(.9+.1*vn(q.xy*18.));}
-    else if(id<24.5){alb=lin(vec3(.25,.56,.23));}
+    // 20 블레이저 / 21 캡 / 22 피부 / 23 셔츠·나비넥타이 / 24 머리·조끼.
+    if(id<20.5){alb=lin(vec3(.34,.63,.79));
+      if(q.z>.23&&q.y>1.4)alb=lin(vec3(.43,.71,.85));
+      alb*=.94+.06*smoothstep(.9,1.8,q.y);spec=.08;gloss=12.;}
+    else if(id<21.5){alb=lin(vec3(.29,.53,.68));vec3 h=q;
+      if(uHat.w>.5&&length(p-uHat.xyz)<1.2*uDw2.x){
+        h=rotY((p-uHat.xyz)/uDw2.x,.65);h=vec3(.94*h.x-.342*h.y,.342*h.x+.94*h.y+2.985,h.z);}
+      float band=smoothstep(.012,.025,abs(h.y-2.86));alb*=mix(.7,1.,band);
+      float seam=abs(h.x+.035+(h.y-3.025)*.12);alb*=mix(.86,1.,smoothstep(.008,.02,seam));
+      spec=.08;gloss=12.;}
+    else if(id<22.5){alb=lin(vec3(.99,.77,.59));
+      if(q.z>.34){float cheek=length((vec2(abs(q.x)-.34,q.y-2.29))/vec2(.15,.1));
+        alb=mix(alb,lin(vec3(.98,.58,.44)),(1.-smoothstep(.2,1.,cheek))*.28);
+        float smile=abs(q.y-(2.185+.48*q.x*q.x));
+        if(abs(q.x)<.13&&smile<.012)alb=lin(vec3(.40,.21,.14));}}
+    else if(id<23.5){alb=lin(vec3(.99,.97,.90));
+      if(q.y>1.67&&q.y<1.84&&q.z>.315){alb=lin(vec3(.77,.16,.12));spec=.12;}}
+    else if(id<24.5){alb=q.y>2.?lin(vec3(.40,.25,.12)):lin(vec3(.42,.26,.17));spec=.05;}
     else if(id<25.5){float rr=uDw3.y>.5?length(q0.xz):length(trLocal(q).xy);alb=mix(lin(vec3(.10,.17,.42)),lin(vec3(.23,.35,.66)),smoothstep(.9,.1,rr)*.6);
       alb=mix(alb,lin(vec3(.85,.9,1.)),smoothstep(.03,0.,abs(rr-.6))*.25);spec=.22;gloss=60.;}
     else if(id<26.5){alb=lin(vec3(.20,.78,.95));spec=1.;gloss=90.;}
-    else {alb=lin(vec3(.17,.18,.22));}
+    else {alb=lin(vec3(.13,.20,.32));
+      if(q.y<.245&&q.z>-.18&&abs(q.x)<.37){alb=lin(vec3(.36,.21,.12));spec=.18;gloss=25.;}
+      if(q.y>2.){alb=lin(vec3(.055,.043,.035));
+        if(length(vec2(abs(q.x)-.195,q.y-2.535))<.023&&q.z>.49)alb=lin(vec3(1.,.98,.90));}}
   } else if(id>=10.){
     int k=int(id-10.+.5);vec4 nd=vec4(0.);
     for(int i=0;i<10;i++){if(i==k) nd=uNodes[i];}
@@ -621,8 +656,8 @@ const DW_L=v3.norm([-.62,.66,.42]);
 function dwarfRect(){
   if(!DW.on||!CAM) return null;
   const c=Math.cos(DW.yaw), s=Math.sin(DW.yaw), k=DW_S*1.18, pts=[], y0=DW.y+DW.hop;
-  const top=feetMode()?4.25+DW.bounce:3.75;
-  for(const lx of [-1.2,1.2]) for(const lz of [-1.8,1]) for(const ly of [-.1,top]){
+  const top=feetMode()?3.85+DW.bounce:3.4;
+  for(const lx of [-1.2,1.2]) for(const lz of [-1.8,1.1]) for(const ly of [-.1,top]){
     const P=[DW.x+(c*lx-s*lz)*k, y0+ly*k, DW.z+(s*lx+c*lz)*k]; pts.push(P);
     if(ly>0){ const gy=DW.y-.2, t=(P[1]-gy)/DW_L[1]; pts.push([P[0]-DW_L[0]*t,gy,P[2]-DW_L[2]*t]); } }
   for(const a of [0,1.57,3.14,4.71]) pts.push([DW.x+Math.cos(a)*1.5*DW_S,DW.y,DW.z+Math.sin(a)*1.5*DW_S]);

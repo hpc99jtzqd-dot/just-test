@@ -32,6 +32,19 @@
 .wk-d i{font-style:normal;color:var(--ink-soft)}
 .wk-d.wk-future i{color:var(--on-sky-soft)}
 .wk-d svg{width:22px;height:18px;vertical-align:middle}
+/* 주간 기록의 잃은 모자도 챙 있는 파란 캡으로 표시한다. */
+.wk-svg > g > path:first-child,.wk-d svg > path:first-child{
+  d:path("M-9 -3 Q-11 -8 -6 -11 Q0 -15 6 -11 Q10 -9 8 -5 L6 -3 Q10 -3 11 0 Q5 2 -1 0 L-7 1 Z");
+  fill:#588fab;stroke:#315570;stroke-width:1;stroke-linejoin:round
+}
+.wk-svg > g > path:first-child + circle{display:none}
+/* #dwarf의 인라인 SVG를 복제하는 주간 캐릭터에서도 발 기준점을 유지한다. */
+.wk-dwarf .body,.wk-dwarf .wob{transform-origin:20px 47px;transform-box:view-box}
+.wk-dwarf .dw-boy{stroke-linecap:round;stroke-linejoin:round}
+.wk-dwarf .dw-feet{display:none}
+.wk-dwarf[data-hat="0"] .dw-hat{display:none}
+.wk-dwarf[data-tramp="none"] .dw-tramp,.wk-dwarf[data-tramp="feet"] .dw-tramp{display:none}
+.wk-dwarf[data-tramp="feet"] .dw-feet{display:inline}
 .wk-status{margin:0;padding:9px 14px;border-radius:14px;background:linear-gradient(180deg,var(--glass-hi),var(--glass-lo));border:1px solid var(--glass-edge);color:var(--ink);font-size:14px;line-height:1.5}
 .wk-status b{font-family:var(--f-game);font-weight:400}
 body.wk-on #info,body.wk-on .stage .dwarf{display:none}
