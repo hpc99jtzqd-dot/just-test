@@ -3,15 +3,21 @@ const MAP_SCENES = {
   dayHeight(x,z){return .8*Math.sin(x*.045)+.55*Math.cos(z*.06);},
   // 앞의 dayConifers 그루는 층층 침엽수(사진 6), 나머지는 줄기가 보이는 활엽수(사진 7).
   // 침엽수는 큰길 가장자리 4~6 거리에 붙여 시점에서 길 양옆이 닫히게 한다. 셰이더 배열 한도 16그루.
+  // 어느 장소의 카메라에서도 다음 장소 표지까지의 시선을 수관이 막지 않게 놓는다(1·2·4·6번은 그래서 옮겼다).
   dayConifers:7,
-  dayTrees:[[-16,43,3.7],[4,44.5,3.9],[30,29.5,3.6],[46,22,3.8],[12,12.5,3.3],[29,-14,3.5],[-4,-13,3.6],
+  dayTrees:[[-16,43,3.7],[5,44.5,3.9],[31.9,34.6,3.6],[46,22,3.8],[8,13.1,3.3],[29,-14,3.5],[-4.5,-13.9,3.6],
             [-38,31,3.8],[-18,23,3.6],[14,21,3.3],[43,31,3.9],[-9,1,3.5],[23,43,3.0],[36,9,3.1],[7,-17,3.3],[-8,29,2.6]],
-  treeClear(tree,ro,hero,ground){
-    const [x,z,s]=tree,g=ground(x,z),v=hero.map((h,i)=>h-ro[i]),len=v.reduce((sum,c)=>sum+c*c,0)||1;
-    // Conservative crown/bush bounds protect the complete cap-to-feet silhouette.
-    return [[-.65,3.15,.15,1.75],[.65,4.05,.1,1.5],[.7,2.95,-.6,1.4],[.5,.55,-.4,1.05]].every(([cx,cy,cz,r])=>{
-      const c=[x+cx*s,g+cy*s,z+cz*s],d=c.map((n,i)=>n-ro[i]),t=Math.max(0,Math.min(1,d.reduce((a,n,i)=>a+n*v[i],0)/len));
-      return Math.hypot(...d.map((n,i)=>n-v[i]*t))>r*s+2.;
+  // 카메라에서 소년(발·가슴·모자 세 점)까지의 시선을 수관이 막으면 false. hero는 가슴 높이 점이다.
+  // 침엽수는 아랫단이 넓은 원뿔이라 활엽수와 다른 구 묶음으로 잰다.
+  treeClear(tree,ro,hero,ground,conifer){
+    const [x,z,s]=tree,g=ground(x,z);
+    const crowns=conifer?[[0,1.7,0,1.8],[0,3.4,0,1.4],[0,4.9,0,1.0]]:[[-.65,3.15,.15,1.75],[.65,4.05,.1,1.5],[.7,2.95,-.6,1.4],[.5,.55,-.4,1.05]];
+    return [-1.5,0,1.8].every(dy=>{
+      const v=[hero[0]-ro[0],hero[1]+dy-ro[1],hero[2]-ro[2]],len=v.reduce((sum,c)=>sum+c*c,0)||1;
+      return crowns.every(([cx,cy,cz,r])=>{
+        const c=[x+cx*s,g+cy*s,z+cz*s],d=c.map((n,i)=>n-ro[i]),t=Math.max(0,Math.min(1,d.reduce((a,n,i)=>a+n*v[i],0)/len));
+        return Math.hypot(...d.map((n,i)=>n-v[i]*t))>r*s+2.;
+      });
     });
   },
   camera(id,nodes,ground,aspect){

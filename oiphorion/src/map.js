@@ -64,6 +64,15 @@ const plen=a=>{let s=0;for(let i=1;i<a.length;i++) s+=Math.hypot(a[i][0]-a[i-1][
 const ROAD=catmull(MAIN_CTRL,SEG), SPUR=catmull(SPUR_CTRL,SEG);
 /* 샛길: 출발에서 들꽃 사이 풀길로 곧장 점심까지. 오전 칸이 꺼진 날(늦잠)에만 열린다 */
 const SIDE=catmull([NXZ.dawn,[-17,29.5],[0,26],NXZ.lunch],SEG);
+/* 2선 들꽃 샛길: 장소와 장소 사이마다 큰길에서 옆으로 비켜난 풀길. 양 끝은 장소에서 큰길과 만나고
+   가운데는 D만큼 떨어진다(+는 진행 방향 왼쪽). 2선인 날 소년은 큰길 대신 이 길로 다닌다.
+   값은 나무·바위·천막·다른 장소를 피하도록 골랐다(tools/map-terrain.test.cjs가 확인). */
+const MEADOW_OFFSET={dawn:-4.5,morning:-6,lunch:-6,afternoon:-6,evening:6,hobby:-9,closing:5};
+function offsetPath(pts,D){ const n=pts.length;
+  return pts.map((p,i)=>{ const a=pts[Math.max(0,i-1)],b=pts[Math.min(n-1,i+1)],dx=b[0]-a[0],dz=b[1]-a[1],l=Math.hypot(dx,dz)||1,w=D*Math.pow(Math.sin(Math.PI*i/(n-1)),.8);
+    return [p[0]-dz/l*w,p[1]+dx/l*w]; }); }
+const MEADOW=Object.entries(MEADOW_OFFSET).map(([a,D])=>{ const b=MAIN[MAIN.indexOf(a)+1];
+  return {a,b,pts:offsetPath(ROAD.slice(MAIN_NODE_CTRL[a]*SEG,MAIN_NODE_CTRL[b]*SEG+1),D)}; });
 const NODE_HEIGHT={dawn:0,morning:3.2,lunch:6.5,afternoon:10,evening:14,hobby:18,closing:22,camp:26,sunday:35,minimum:8};
 function buildTerrain(){
   const anchors=NODE_ORDER.map(id=>[...NXZ[id],NODE_HEIGHT[id]]).concat([[4,-8.6,24],[18,-16,29],[18,-25,32.3]]);
@@ -105,7 +114,7 @@ function carve(P,half,Q){
     const dx=bx-ax, dz=bz-az, L2=dx*dx+dz*dz||1;
     for(let j=j0;j<=j1;j++) for(let i=i0;i<=i1;i++){ const x=DOM.x0+i*DOM.res, z=DOM.z0+j*DOM.res; let t=((x-ax)*dx+(z-az)*dz)/L2; t=Math.max(0,Math.min(1,t));
       const d=Math.hypot(x-ax-dx*t,z-az-dz*t)/w, k=j*DOM.nx+i; if(d<Q[k]) Q[k]=d; } } }
-carve(ROAD,roadHalf,QM); carve(SIDE,()=>.85,QS); carve(SPUR,()=>.70,QP);
+carve(ROAD,roadHalf,QM); carve(SIDE,()=>.85,QS); MEADOW.forEach(m=>carve(m.pts,()=>.85,QS)); carve(SPUR,()=>.70,QP);
 
 /* 정적인 눈길 흔적: 텍셀당 4×4 부분 샘플, 기존 uPath의 B/A를 재사용한다. */
 function footprints(paths,mask,channel){
@@ -126,8 +135,9 @@ function footprints(paths,mask,channel){
 /* 길 그래프: 노드 사이를 잇는 큰길 조각, 오솔길 두 조각, 샛길 하나. 걷기는 이 위에서 최단 경로를 찾는다 */
 const EDGES=[];
 MAIN.slice(1).forEach((b,i)=>{ const a=MAIN[i]; EDGES.push({a,b,pts:ROAD.slice(MAIN_NODE_CTRL[a]*SEG,MAIN_NODE_CTRL[b]*SEG+1)}); });
-EDGES.push({a:"dawn",b:"minimum",pts:SPUR.slice(0,SEG+1)},{a:"minimum",b:"closing",pts:SPUR.slice(SEG)},{a:"dawn",b:"lunch",pts:SIDE,side:true});
-EDGES.forEach(e=>{ e.len=plen(e.pts); e.cost=e.side?e.len*.7:e.len; });  // 샛길은 지름길이라 열려 있으면 먼저 고른다
+EDGES.push({a:"dawn",b:"minimum",pts:SPUR.slice(0,SEG+1),spur:true},{a:"minimum",b:"closing",pts:SPUR.slice(SEG),spur:true},{a:"dawn",b:"lunch",pts:SIDE,side:true});
+MEADOW.forEach(m=>EDGES.push({a:m.a,b:m.b,pts:m.pts,meadow:true}));
+EDGES.forEach(e=>{ e.len=plen(e.pts); });
 
 /* Scene resources share path topology, but never change progression data. */
 let sceneMode="day", dayZone=0;
@@ -219,7 +229,8 @@ uniform vec4 uNodes[10]; uniform vec4 uTrees[48]; uniform vec4 uRocks[6];
 uniform vec3 uTent, uSign, uFlag, uDoor; uniform float uSignRot; uniform vec2 uDoorUV;
 uniform vec4 uDw, uDw2;  // 난쟁이: 발 위치 xyz · 바라보는 방향 / 크기 · 찌그러짐 · 켜짐 · 뜬 높이
 uniform vec4 uDw3;  // 모자 씀 · 트램펄린을 발밑에(3선) · 트램펄린 위로 튄 높이 · 트램펄린 없음(그 주에 잃음)
-uniform vec4 uHat;  // 잃어버린 모자가 놓인 자리 xyz · 보임
+uniform vec4 uHats[6];  // 그 주에 잃은 모자들: 놓인 자리 xyz · 돌린 각도. 없으면 y=-500
+uniform vec4 uBroken;   // 잃은 트램펄린(망가진 채 누움): 자리 xyz · 돌린 각도. 없으면 y=-500
 uniform sampler2D uPath; uniform vec2 uPathOn;  // 샛길·오솔길 거리(R·G) / 각 길이 열렸는지
 const float ROCK_START=${glslFloat(M.rockStart)},ROCK_END=${glslFloat(M.rockEnd)},SNOW_START=${glslFloat(M.snowStart)},SNOW_END=${glslFloat(M.snowEnd)};
 const float FLOWERS=${glslFloat(M.flowerThreshold)},FOG_START=${glslFloat(M.fogStart)},FOG_DENSITY=${glslFloat(M.fogDensity)};
@@ -380,11 +391,22 @@ vec2 dwarf(vec3 p){
   return vec2(d*k,id);
 }
 /* 잃어버린 모자: 동일한 파란 캡을 풀밭에 살짝 기울여 놓는다. */
-float lostHat(vec3 p){vec3 q=(p-uHat.xyz)/uDw2.x;float b=length(q-vec3(.15,0.,.1))-.95;if(b>.3)return b*uDw2.x;
-  vec3 h=rotY(q,.65);h=vec3(.94*h.x-.342*h.y,.342*h.x+.94*h.y,h.z);
+float lostHat(vec3 p,vec4 hat){vec3 q=(p-hat.xyz)/uDw2.x;float b=length(q-vec3(.15,0.,.1))-.95;if(b>.3)return b*uDw2.x;
+  vec3 h=rotY(q,hat.w);h=vec3(.94*h.x-.342*h.y,.342*h.x+.94*h.y,h.z);
   float t=sdEll(h-vec3(-.035,.04,-.055),vec3(.64,.285,.54));
   t=smin(t,sdEll(h-vec3(0.,-.125,.015),vec3(.565,.065,.49)),.025);
   t=min(t,sdEll(h-vec3(0.,-.105,.455),vec3(.5,.055,.285)));return t*uDw2.x;}
+/* 망가진 트램펄린: 한쪽이 땅에 닿게 기울어 누웠고, 테 한 군데가 끊기고 매트가 찢어졌으며 다리 둘이 꺾였다.
+   28 테(끊김) / 29 매트(찢김) / 30 다리. 소년의 27(다리·신발)과 나누는 건 소년 몸 좌표로 색을 고르기 때문 */
+vec2 brokenTramp(vec3 p){vec3 q=rotY((p-uBroken.xyz)/uDw2.x,uBroken.w);float b=length(q-vec3(0.,.35,0.))-1.45;if(b>.3)return vec2(b*uDw2.x,28.);
+  vec3 t=q-vec3(0.,.42,0.);float c=.906,s=.423;t=vec3(t.x,c*t.y-s*t.z,s*t.y+c*t.z);  // x축으로 25도 기울임
+  float r=length(t.xz),ang=abs(atan(t.z,t.x)-1.2);
+  float rim=max(length(vec2(r-.95,t.y))-.1,-(ang-.28)*r);  // 테의 끊긴 틈
+  vec2 cy=vec2(r-.92,abs(t.y+.02)-.035);float mat=min(max(cy.x,cy.y),0.)+length(max(cy,0.));
+  float tear=max(abs(t.x*.8-t.z*.6)-.04,-(t.x*.6+t.z*.8)+.05);mat=max(mat,-tear);  // 가운데에서 가장자리로 찢김
+  float leg=min(sdCap(t,vec3(.62,-.05,.62),vec3(.95,-.25,.35),.05),sdCap(t,vec3(-.66,-.05,-.6),vec3(-.62,.35,-.95),.05));
+  float d=rim,id=28.;if(mat<d){d=mat;id=29.;}if(leg<d){d=leg;id=30.;}
+  return vec2(d*uDw2.x,id);}
 vec2 obj(vec3 p,float foliage){
   float d=1e5,id=0.;
   for(int i=0;i<10;i++){vec3 q=p-uNodes[i].xyz;float b=length(q)-3.;float dd=b>.4?b:sdNode(q);if(uDay>.5&&b<.4)dd=min(sdBox(q-vec3(0.,.7,0.),vec3(.09,.9,.09)),sdBox(q-vec3(0.,1.7,0.),vec3(.8,.32,.12)));if(dd<d){d=dd;id=10.+float(i);}}
@@ -429,7 +451,8 @@ vec2 obj(vec3 p,float foliage){
     else{float fr=sdBox(q-vec3(0.,1.35,0.),vec3(.78,1.42,.1));float pn=sdBox(q-vec3(0.,1.3,.06),vec3(.64,1.28,.08));
       if(fr<d){d=fr;id=9.;} if(pn<d){d=pn;id=9.5;}}}
   vec2 w=dwarf(p);if(w.x<d){d=w.x;id=w.y;}
-  if(uHat.w>.5){float h=lostHat(p);if(h<d){d=h;id=21.;}}
+  for(int i=0;i<6;i++){if(uHats[i].y>-100.){float h=lostHat(p,uHats[i]);if(h<d){d=h;id=21.;}}}
+  if(uBroken.y>-100.){vec2 bt=brokenTramp(p);if(bt.x<d){d=bt.x;id=bt.y;}}
   return vec2(d,id);
 }
 float objNormalDistance(vec3 p){return obj(p,${sceneMode==='day'?'0.':'1.'}).x;}
@@ -498,7 +521,7 @@ vec3 shadeGround(vec3 p,vec3 rd,float t){
   vec4 path=texture2D(uPath,(g+.5)/uHN);
   vec2 pq=path.rg*3.;
   float road=1.-smoothstep(.80,1.12,q);
-  float side=uDay*(1.-smoothstep(.72,1.1,pq.x))*mix(.16,1.,uPathOn.x);
+  float side=uDay*(1.-smoothstep(.72,1.1,pq.x))*mix(.07,1.,uPathOn.x);
   float spur=uDay*(1.-smoothstep(.7,1.08,pq.y))*mix(.12,1.,uPathOn.y);
   float trail=max(road,max(side,spur));
   // 밝은 석회암 자갈. 패임 없이 가는 등산로로 이어진다.
@@ -529,7 +552,8 @@ vec3 shadeGround(vec3 p,vec3 rd,float t){
   for(int i=0;i<10;i++){float d=length(p.xz-uNodes[i].xz);ao*=mix(.45,1.,smoothstep(1.2,2.6,d));}
   for(int i=0;i<${M.treeCount*3};i+=3){vec4 tr=uTrees[i];float d=length(p.xz-tr.xz);ao*=mix(.5,1.,smoothstep(tr.w*.4,tr.w*1.9,d));}
   ao*=mix(.55,1.,smoothstep(-6.,0.,s+2.));
-  if(uHat.w>.5)ao*=mix(.6,1.,smoothstep(.3,1.5,length(p.xz-uHat.xz-vec2(.15*uDw2.x,.1*uDw2.x))));
+  for(int i=0;i<6;i++){if(uHats[i].y>-100.)ao*=mix(.6,1.,smoothstep(.3,1.5,length(p.xz-uHats[i].xz-vec2(.15*uDw2.x,.1*uDw2.x))));}
+  if(uBroken.y>-100.)ao*=mix(.55,1.,smoothstep(.6,2.2,length(p.xz-uBroken.xz)/uDw2.x));
   if(uDw2.z>.5){float dd=length(p.xz-uDw.xz)/uDw2.x;ao*=mix(mix(.42,.9,clamp(uDw2.w*.7,0.,1.)),1.,smoothstep(.35,1.3,dd));}
   float dif=max(dot(n,uL),0.)*shadow(p+n*.08,1.);
   if(uDay>.5){
@@ -573,8 +597,8 @@ vec3 shadeObj(vec3 p,vec3 rd,float id,float t){
       if(q.z>.23&&q.y>1.4)alb=lin(vec3(.43,.71,.85));
       alb*=.94+.06*smoothstep(.9,1.8,q.y);spec=.08;gloss=12.;}
     else if(id<21.5){alb=lin(vec3(.29,.53,.68));vec3 h=q;
-      if(uHat.w>.5&&length(p-uHat.xyz)<1.2*uDw2.x){
-        h=rotY((p-uHat.xyz)/uDw2.x,.65);h=vec3(.94*h.x-.342*h.y,.342*h.x+.94*h.y+2.985,h.z);}
+      for(int i=0;i<6;i++){vec4 hat=uHats[i];if(hat.y>-100.&&length(p-hat.xyz)<1.2*uDw2.x){
+        h=rotY((p-hat.xyz)/uDw2.x,hat.w);h=vec3(.94*h.x-.342*h.y,.342*h.x+.94*h.y+2.985,h.z);}}
       float band=smoothstep(.012,.025,abs(h.y-2.86));alb*=mix(.7,1.,band);
       float seam=abs(h.x+.035+(h.y-3.025)*.12);alb*=mix(.86,1.,smoothstep(.008,.02,seam));
       spec=.08;gloss=12.;}
@@ -586,6 +610,10 @@ vec3 shadeObj(vec3 p,vec3 rd,float id,float t){
     else if(id<23.5){alb=lin(vec3(.99,.97,.90));
       if(q.y>1.67&&q.y<1.84&&q.z>.315){alb=lin(vec3(.77,.16,.12));spec=.12;}}
     else if(id<24.5){alb=q.y>2.?lin(vec3(.40,.25,.12)):lin(vec3(.42,.26,.17));spec=.05;}
+    else if(id>27.5){vec3 t=rotY((p-uBroken.xyz)/uDw2.x,uBroken.w);float r=length(t.xz);
+      if(id<28.5){alb=lin(vec3(.20,.78,.95))*.8;spec=.6;gloss=60.;}  // 끊긴 테: 원래 하늘색, 조금 바랬다
+      else if(id<29.5){alb=mix(lin(vec3(.10,.17,.42)),lin(vec3(.23,.35,.66)),smoothstep(.9,.1,r)*.5)*.85;spec=.1;gloss=20.;}
+      else{alb=lin(vec3(.13,.20,.32));spec=.2;gloss=25.;}}
     else if(id<25.5){float rr=uDw3.y>.5?length(q0.xz):length(trLocal(q).xy);alb=mix(lin(vec3(.10,.17,.42)),lin(vec3(.23,.35,.66)),smoothstep(.9,.1,rr)*.6);
       alb=mix(alb,lin(vec3(.85,.9,1.)),smoothstep(.03,0.,abs(rr-.6))*.25);spec=.22;gloss=60.;}
     else if(id<26.5){alb=lin(vec3(.20,.78,.95));spec=1.;gloss=90.;}
@@ -713,7 +741,7 @@ function initGL(){
   [gl.TEXTURE_WRAP_S,gl.TEXTURE_WRAP_T].forEach(p=>gl.texParameteri(gl.TEXTURE_2D,p,gl.REPEAT));
   const pd=new Uint8Array(DOM.nx*DOM.nz*4);
   for(let k=0;k<QS.length;k++){ pd[k*4]=Math.round(Math.min(QS[k],3)/3*255); pd[k*4+1]=Math.round(Math.min(QP[k],3)/3*255); }
-  footprints([ROAD],pd,2);footprints([SIDE,SPUR],pd,3);
+  footprints([ROAD],pd,2);footprints([SIDE,SPUR,...MEADOW.map(m=>m.pts)],pd,3);
   const t2=gl.createTexture(); gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D,t2);
   gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,DOM.nx,DOM.nz,0,gl.RGBA,gl.UNSIGNED_BYTE,pd);
   [gl.TEXTURE_MIN_FILTER,gl.TEXTURE_MAG_FILTER].forEach(p=>gl.texParameteri(gl.TEXTURE_2D,p,gl.LINEAR));
@@ -734,7 +762,7 @@ function useMapProgram(n){
       if(!gl.getShaderParameter(sh,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(sh));gl.attachShader(next,sh);
     }
     gl.linkProgram(next);if(!gl.getProgramParameter(next,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(next));
-    const uniforms={};for(const name of ['uDay','uRes','uRo','uCu','uCv','uCw','uFl','uHm','uCl','uHN','uDom','uL','uNodes','uTrees','uRocks','uTent','uSign','uFlag','uDoor','uSignRot','uDoorUV','uDw','uDw2','uDw3','uHat','uPath','uPathOn'])uniforms[name]=gl.getUniformLocation(next,name);
+    const uniforms={};for(const name of ['uDay','uRes','uRo','uCu','uCv','uCw','uFl','uHm','uCl','uHN','uDom','uL','uNodes','uTrees','uRocks','uTent','uSign','uFlag','uDoor','uSignRot','uDoorUV','uDw','uDw2','uDw3','uHats','uBroken','uPath','uPathOn'])uniforms[name]=gl.getUniformLocation(next,name);
     const loc=gl.getAttribLocation(next,'a'),old=prog;
     gl.useProgram(next);gl.bindBuffer(gl.ARRAY_BUFFER,vertexBuffer);gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
     prog=next;U=uniforms;compiledMap=n;compiledScene=sceneMode;bindScenery();
@@ -751,7 +779,7 @@ function bindScenery(){
   const tr=[];window.__dayTreeMask=[];DAY_TREES_ON.length=0;
   const list=(sceneMode==="day"?MAP_SCENES.dayTrees:TREES).map(([x,z,s],i)=>[x,groundY(x,z),z,s,i]);
   if(sceneMode==='day'){
-    list.forEach(t=>{const clear=MAP_SCENES.treeClear([t[0],t[2],t[3]],CAM.ro,[DW.x,DW.y+1.8,DW.z],groundY);window.__dayTreeMask.push(clear);if(clear)DAY_TREES_ON.push(t);});
+    list.forEach(t=>{const clear=MAP_SCENES.treeClear([t[0],t[2],t[3]],CAM.ro,[DW.x,DW.y+1.8,DW.z],groundY,t[4]<MAP_SCENES.dayConifers);window.__dayTreeMask.push(clear);if(clear)DAY_TREES_ON.push(t);});
     const d=doorSpot();DOOR_UV=d.slice(0,2);d[2].forEach(i=>window.__dayTreeMask[i]=false);
   }
   list.forEach(([x,y,z,s],i)=>{if(sceneMode==='day'&&!window.__dayTreeMask[i])y=-200;
@@ -833,10 +861,10 @@ function buildOverlay(){
   if(!gl){
     let fallback=document.getElementById("dayFallbackPaths");
     if(!fallback){fallback=document.createElementNS("http://www.w3.org/2000/svg","g");fallback.id="dayFallbackPaths";svg.prepend(fallback);}
-    fallback.innerHTML=[ROAD,SIDE,SPUR].map((path,i)=>{
-      const points=path.map(p=>project(P3(...p,.08))).filter(p=>p[2]>2);
-      return `<path d="${points.length?'M'+points.map(p=>p.slice(0,2).join(' ')).join(' L'):''}" fill="none" stroke="${['#eee0b7','#a8bd65','#b28c55'][i]}" stroke-width="${[14,9,5][i]}" stroke-linecap="round"/>`;
-    }).join('');
+    // 길 종류마다 path 하나: 1선 큰길 / 2선 들꽃 샛길(지름길 + 구간 샛길을 여러 줄기로) / 3선 오솔길
+    const sub=path=>{const points=path.map(p=>project(P3(...p,.08))).filter(p=>p[2]>2);return points.length?'M'+points.map(p=>p.slice(0,2).join(' ')).join(' L'):'';};
+    fallback.innerHTML=[[ROAD],[SIDE,...MEADOW.map(m=>m.pts)],[SPUR]].map((paths,i)=>
+      `<path d="${paths.map(sub).filter(Boolean).join(' ')}" fill="none" stroke="${['#eee0b7','#a8bd65','#b28c55'][i]}" stroke-width="${[14,9,5][i]}" stroke-linecap="round"/>`).join('');
   }
   const sp=SPUR.map(([x,z])=>project(P3(x,z,.08)));
   document.getElementById("spur").setAttribute("d","M"+sp.map(p=>p[0].toFixed(1)+" "+p[1].toFixed(1)).join(" L"));
@@ -914,9 +942,37 @@ function trampMode(){
 }
 const feetMode=()=>trampMode()==="feet";
 const sideOpen=()=>{ const m=byId("morning"); return !!m&&isOff(m); };
-function hatPos(){ const [x,z]=NXZ[hatSpot()], hx=x+1.7, hz=z+1.6; return [hx,groundY(hx,hz)+.48,hz]; }
-function worldUniforms(){if(!gl)return;const h=hatPos();
-  gl.uniform4f(U.uHat,h[0],h[1],h[2],sceneMode==="day"&&hatLost()?1:0);gl.uniform2f(U.uPathOn,sceneMode==="day"&&sideOpen()?1:0,sceneMode==="day"&&state.line===3?1:0);
+const meadowOpen=()=>state.line===2;  // 2선인 날은 큰길 대신 들꽃 샛길로 다닌다
+/* 잃은 것은 잃은 자리에 그 주 내내 남는다(명세 R9).
+   모자: 2선인 날 그날의 모자 자리(수업 날은 집=출발, 아니면 꺼진 오전 칸) 둘레에, 요일마다 다른 방향으로 놓인다.
+   트램펄린: 3선 날 망가졌으면 최소 기준선 칸 옆, 두 번째 2선 날 잃었으면 그날 모자 자리 옆에 누워 있다. */
+const spotOf=dow=>PLANS[dow]&&PLANS[dow].leave?"dawn":"morning";
+function besideSpot(id,ang,r){ const [x,z]=NXZ[id], hx=x+Math.cos(ang)*r, hz=z+Math.sin(ang)*r; return [hx,groundY(hx,hz),hz]; }
+function lostThings(){
+  const sel=selectedDate(), week=JOURNEY.week(sel), hats=[];
+  let broken=null;
+  if(trampMode()==="none"&&week.trampolineLostOn){
+    // 그 장소에 도착했을 때의 카메라에서 소년 오른쪽 조금 앞에 놓아, 소년 몸에 가리지 않게 한다.
+    const d=week.days.find(x=>x.key===week.trampolineLostOn), spot=d.line===3?"minimum":spotOf(d.dow), [nx,nz]=NXZ[spot];
+    const ro=MAP_SCENES.camera(spot,NXZ,groundY,1.6).ro, l=Math.hypot(ro[0]-nx,ro[2]-nz)||1, cx=(ro[0]-nx)/l, cz=(ro[2]-nz)/l;
+    const bx=nx+cz*3.4+cx*1.2, bz=nz-cx*3.4+cz*1.2;
+    broken=[bx,groundY(bx,bz),bz,.4+d.dow*.7];
+  }
+  for(const d of week.days){
+    const today=d.key===sel, lost=today?hatLost():d.key<sel&&d.hatLost;
+    if(!lost) continue;
+    const spot=today?hatSpot():spotOf(d.dow);
+    let p=besideSpot(spot,.55+d.dow*1.05,2.3);
+    if(broken&&Math.hypot(p[0]-broken[0],p[2]-broken[2])<2.6) p=besideSpot(spot,.55+d.dow*1.05+Math.PI,2.3);  // 망가진 트램펄린과 겹치면 반대편
+    hats.push([p[0],p[1]+.48,p[2],.65+d.dow*.9]);
+  }
+  return {hats,broken};
+}
+window.__lost=()=>lostThings();
+function worldUniforms(){if(!gl)return;
+  const L=sceneMode==="day"?lostThings():{hats:[],broken:null}, hv=[];
+  for(let i=0;i<6;i++) hv.push(...(L.hats[i]||[0,-500,0,0]));
+  gl.uniform4fv(U.uHats,new Float32Array(hv)); gl.uniform4fv(U.uBroken,new Float32Array(L.broken||[0,-500,0,0]));gl.uniform2f(U.uPathOn,sceneMode==="day"&&(sideOpen()||meadowOpen())?1:0,sceneMode==="day"&&state.line===3?1:0);
 }
 /* 노드 원판 위에서는 원판 윗면에, 아니면 땅에 발을 디딘다 */
 function feetY(x,z){ const g=groundY(x,z); if(sceneMode==="day")return g;let y=g;
@@ -985,7 +1041,9 @@ function placeDwarfSVG(x,z,hop,squash){
 }
 /* 출발점에서 노드 id까지 최단 경로(다익스트라). 출발점은 노드이거나, 걷던 도중이면 길 조각 위의 한 점 */
 function graphRoute(start,id){
-  const open=EDGES.filter(e=>!e.side||sideOpen()), dist={}, prev={}, head={}, Q=new Set(NODE_ORDER);
+  // 비용: 오전이 꺼진 날의 지름길 샛길은 0.7배. 2선인 날은 들꽃 샛길을 0.9배, 큰길을 3배로 쳐서 샛길로만 다니게 한다.
+  const mo=meadowOpen(), open=EDGES.filter(e=>(!e.side||sideOpen())&&(!e.meadow||mo)), dist={}, prev={}, head={}, Q=new Set(NODE_ORDER);
+  const cost=e=>e.len*(e.side?.7:e.meadow?.9:!e.spur&&mo?3:1);
   NODE_ORDER.forEach(n=>dist[n]=Infinity);
   if(start.node){ dist[start.node]=0; head[start.node]=[NXZ[start.node]]; }
   else { const {e,u,x,z}=start, P=[[x,z]];
@@ -993,7 +1051,7 @@ function graphRoute(start,id){
     dist[e.a]=plen(pa); head[e.a]=pa; if(plen(pb)<dist[e.b]){ dist[e.b]=plen(pb); head[e.b]=pb; } }
   while(Q.size){ let n=null; Q.forEach(c=>{ if(n===null||dist[c]<dist[n]) n=c; }); Q.delete(n); if(dist[n]===Infinity) break;
     for(const e of open){ let m,pts; if(e.a===n){ m=e.b; pts=e.pts; } else if(e.b===n){ m=e.a; pts=e.pts.slice().reverse(); } else continue;
-      if(dist[n]+e.cost<dist[m]){ dist[m]=dist[n]+e.cost; prev[m]={n,pts}; delete head[m]; } } }
+      if(dist[n]+cost(e)<dist[m]){ dist[m]=dist[n]+cost(e); prev[m]={n,pts}; delete head[m]; } } }
   const seq=[]; let c=id; while(prev[c]){ seq.unshift(prev[c].pts); c=prev[c].n; }
   let out=(head[c]||[NXZ[c]]).slice(); seq.forEach(p=>out=out.concat(p.slice(1)));
   return out;
@@ -1052,7 +1110,7 @@ function showInfo(){
     state.line===3?(tm==="none"?"크게 늦은 날. 트램펄린은 이번 주에 이미 잃어서, 오솔길을 걸어서 간다. 최소 기준선까지만 해내자."
       :"크게 늦은 날. 걸어서는 못 가서 트램펄린을 발밑에 깔고 억지로 튀어 간다. 오늘이 지나면 트램펄린은 망가진다.")+again
     :state.line===2?"서두르다 모자를 잃어버렸다("+(PLAN.leave?"집에 두고 나왔다":"꺼진 오전 칸 옆 풀밭")+"). 오늘은 하루 종일 맨머리로 다니고, 내일 아침엔 새 모자를 쓴다."
-      +(breaks?" 이번 주 두 번째 2선이라 트램펄린도 오늘로 잃는다.":tm==="none"?gone:"")+(sideOpen()?" 오전이 꺼진 날엔 들꽃 샛길로 질러간다.":"")+again
+      +(breaks?" 이번 주 두 번째 2선이라 트램펄린도 오늘로 잃는다.":tm==="none"?gone:"")+(sideOpen()?" 오전이 꺼진 날엔 들꽃 샛길로 질러간다.":" 오늘은 큰길 옆 들꽃 샛길로 다닌다.")+again
     :"다른 칸을 누르면 난쟁이가 큰길로 걸어간다."+(tm==="none"?gone:"")+again;
 }
 /* 일요일(오늘)에 산 정상 칸을 누르면: 정상까지 걸어가서 점프 연출을 본다. 이미 정상에 있으면 바로 */

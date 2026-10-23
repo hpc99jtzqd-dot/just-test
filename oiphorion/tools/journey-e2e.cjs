@@ -227,6 +227,28 @@ test('V2 주간 폰 표지 충돌·pending/before/inferred/future',()=>session('
   assert.equal(db.writeCount(),0);
 }));
 
+test('V3 2선은 들꽃 샛길로 걷고, 잃은 모자·트램펄린은 그 주 내내 남는다', () => session('2026-11-05T08:00', { fixture: 'lose2' }, async p => {
+  const r = await p.evaluate(() => {
+    const dev = pts => Math.max(...pts.map(([x, z]) => Math.min(...ROAD.map(([a, c]) => Math.hypot(a - x, c - z)))));
+    const saved = state.line, one = dev(route('lunch', 'afternoon'));
+    state.line = 2; const two = dev(route('lunch', 'afternoon')); state.line = saved;
+    return { one, two, lost: window.__lost() };
+  });
+  assert.ok(r.one < .01, '1선은 큰길 그대로');
+  assert.ok(r.two > 3, '2선은 큰길에서 비켜난 샛길 ' + r.two);
+  assert.equal(r.lost.hats.length, 2, '월·수에 잃은 모자 두 개가 목요일에도 남음');
+  assert.ok(r.lost.broken, '수요일에 잃은 트램펄린이 망가진 채 남음');
+}));
+test('V3 3선 당일엔 발밑, 다음 날부터 망가진 트램펄린이 최소 기준선 옆에', async () => {
+  await session('2026-11-03T10:00', { fixture: 'lose3' }, async p => {
+    assert.equal(await p.evaluate(() => window.__lost().broken), null);
+  });
+  await session('2026-11-04T10:00', { fixture: 'lose3' }, async p => {
+    const b = await p.evaluate(() => { const b = window.__lost().broken; return b && Math.hypot(b[0] - NXZ.minimum[0], b[2] - NXZ.minimum[1]); });
+    assert.ok(b != null && b < 4.5, '최소 기준선 옆 ' + b);
+  });
+});
+
 (async () => {
   let failed = 0;
   browser = await chromium.launch({ args });

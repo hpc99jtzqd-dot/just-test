@@ -21,6 +21,8 @@ test('하루 숲은 카메라와 소년 사이를 가리는 수풀만 제외한�
   const clear=context.scenes.treeClear,ro=[0,2,10],boy=[0,1.8,0],ground=()=>0;
   assert.equal(clear([0,4,2],ro,boy,ground),false,'앞쪽 수풀이 몸을 가린다');
   assert.equal(clear([25,4,2],ro,boy,ground),true,'멀리 옆의 숲은 보존한다');
+  assert.equal(clear([3.5,4,2],ro,boy,ground,true),false,'침엽수의 넓은 아랫단도 가림으로 본다');
+  assert.equal(clear([25,4,2],ro,boy,ground,true),true,'멀리 옆 침엽수는 보존한다');
 });
 test('주간 6구간이 끊김 없이 큰길 전체를 덮는다',()=>{
   const sections=context.scenes.sections(ROAD);
@@ -72,6 +74,26 @@ test('바위는 길 가장자리 1.5, 노드 중심 4 밖에만 배치', () => {
         const t=Math.max(0,Math.min(1,((x-ax)*dx+(z-az)*dz)/(dx*dx+dz*dz)));
         assert.ok(Math.hypot(x-ax-dx*t,z-az-dz*t)-half(i-1)>=1.5);
       }
+    }
+  }
+});
+
+test('2선 들꽃 샛길은 장소에서 큰길과 만나고, 나무·바위·천막·다른 장소를 피한다', () => {
+  const meadow=vm.runInContext('MEADOW',context), scenes=context.scenes;
+  // 바위 시험이 이미 ROCKS를 선언했으면 그대로 쓰고, 천막 자리만 따로 읽는다.
+  const ROCKS=vm.runInContext("typeof ROCKS==='undefined'?(()=>{"+source.slice(source.indexOf('const TREES='),source.indexOf('const TENT='))+"return ROCKS;})():ROCKS",context);
+  const TENT=vm.runInContext("(()=>{"+source.slice(source.indexOf('const TENT='),source.indexOf('const CLOUD_Y='))+"return TENT;})()",context);
+  assert.equal(meadow.length,7);
+  for(const m of meadow){
+    const first=m.pts[0],last=m.pts[m.pts.length-1];
+    assert.ok(Math.hypot(first[0]-NXZ[m.a][0],first[1]-NXZ[m.a][1])<1e-6&&Math.hypot(last[0]-NXZ[m.b][0],last[1]-NXZ[m.b][1])<1e-6, m.a+'→'+m.b+' 끝점');
+    const mid=m.pts[m.pts.length>>1], roadGap=Math.min(...ROAD.map(([x,z])=>Math.hypot(x-mid[0],z-mid[1])));
+    assert.ok(roadGap>=3.5, m.a+' 가운데가 큰길과 떨어짐 '+roadGap);
+    for(const [x,z] of m.pts){
+      for(const [tx,tz,s] of scenes.dayTrees)assert.ok(Math.hypot(x-tx,z-tz)>=.75*s+1.2, m.a+' 나무 '+tx+','+tz);
+      for(const [rx,rz] of ROCKS)assert.ok(Math.hypot(x-rx,z-rz)>=2.6, m.a+' 바위');
+      assert.ok(Math.hypot(x-TENT[0],z-TENT[1])>=4.2, m.a+' 천막');
+      for(const [id,[nx,nz]] of Object.entries(NXZ))if(id!==m.a&&id!==m.b)assert.ok(Math.hypot(x-nx,z-nz)>=3, m.a+' 장소 '+id);
     }
   }
 });
