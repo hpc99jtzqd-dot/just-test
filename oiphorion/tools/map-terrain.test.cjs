@@ -7,9 +7,28 @@ const source = fs.readFileSync(require('node:path').join(__dirname, '../src/map.
 const context = vm.createContext({});
 vm.runInContext(`const NODE_ORDER=${JSON.stringify(['dawn','morning','lunch','afternoon','evening','hobby','closing','camp','sunday','minimum'])};
 const MAIN=NODE_ORDER.slice(0,9);
-${source.slice(source.indexOf('const fract='), source.indexOf('/* 물건들 */'))}
+${source.slice(source.indexOf('const fract='), source.indexOf('/* Scene resources'))}
 globalThis.terrain={DOM,HM,NXZ,NODE_HEIGHT,groundY,ROAD,SIDE,SPUR,roadHalf};`, context);
 const { DOM, HM, NXZ, NODE_HEIGHT, groundY, ROAD, SIDE, SPUR } = context.terrain;
+const sceneSource=fs.readFileSync(require('node:path').join(__dirname,'../src/map-scenes.js'),'utf8');
+vm.runInContext(sceneSource+';globalThis.scenes=MAP_SCENES;',context);
+test('하루 지형은 완만하고 주간 지형 자료를 바꾸지 않는다',()=>{
+  const h=context.scenes.dayHeight;
+  for(let x=-40;x<50;x+=2)for(let z=-40;z<50;z+=2){assert.ok(Math.abs(h(x,z))<=1.35);assert.ok(Math.hypot((h(x+.1,z)-h(x,z))/.1,(h(x,z+.1)-h(x,z))/.1)<.06);}
+  assert.equal(groundY(...NXZ.sunday),35);
+});
+test('하루 숲은 카메라와 소년 사이를 가리는 수풀만 제외한다',()=>{
+  const clear=context.scenes.treeClear,ro=[0,2,10],boy=[0,1.8,0],ground=()=>0;
+  assert.equal(clear([0,4,2],ro,boy,ground),false,'앞쪽 수풀이 몸을 가린다');
+  assert.equal(clear([25,4,2],ro,boy,ground),true,'멀리 옆의 숲은 보존한다');
+});
+test('주간 6구간이 끊김 없이 큰길 전체를 덮는다',()=>{
+  const sections=context.scenes.sections(ROAD);
+  assert.equal(sections.length,6);assert.deepEqual(sections[0].points[0],ROAD[0]);
+  for(let i=1;i<6;i++)assert.deepEqual(sections[i-1].points[24],sections[i].points[0]);
+  assert.deepEqual(sections[5].points[24],ROAD[ROAD.length-1]);
+  const heights=sections.map(s=>groundY(...s.center));assert.ok(heights.every((h,i)=>!i||h>heights[i-1]));
+});
 
 test('맵 슬롯 높이와 원판 아래 평탄면, 정상 최고점', () => {
   for (const [id, [x, z]] of Object.entries(NXZ)) {

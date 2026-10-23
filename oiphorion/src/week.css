@@ -88,3 +88,59 @@ body.wk-on #info,body.wk-on .stage .dwarf{display:none}
   .wk-jump.go .wk-dw,.wk-jump.go .wk-dw-in,.wk-jump.go .wk-tramp{animation:none}
   .wk-jump.go .wk-jump-text{animation:wk-fadein .6s ease-out both;opacity:1}
 }
+
+/* Journey scene: a quiet landscape with a readable itinerary at its edge. */
+.journey-day #signText,.journey-day #trail{display:none}
+.journey-day .stage.nogl #trail{display:block}
+.journey-day .stage.nogl{background:linear-gradient(#b7ddeb 0%,#e3edd4 42%,#a8c978 43%,#678647 100%)}
+#dayMarkers{position:absolute;inset:0;pointer-events:none}
+#dayMarkers button{position:absolute;transform:translate(-50%,-100%);padding:6px 10px;min-height:32px;pointer-events:auto;cursor:pointer;border-radius:5px;background:#fffae5e8;color:#3b5334;font:12px var(--f-game);border:1px solid #81966c}
+#dayMarkers button:focus-visible{outline:3px solid #244c3c;outline-offset:3px}
+#dayMarkers button[data-route="1"]{border-bottom:4px solid #c6a574}
+#dayMarkers button[data-route="2"]{border-bottom:4px solid #729c46;background:#f6ffdceF}
+#dayMarkers button[data-route="3"]{border-bottom:4px dashed #ac814a;background:#fff2daeF}
+body.wk-on #dayMarkers{display:none}
+.day-places:before{content:"1선 큰길 · 2선 들꽃 샛길 · 3선 오솔길";grid-column:1/-1;font-size:12px;color:#2f492e;background:#fffbe5d9;border-radius:6px;padding:5px 8px;text-align:center}
+.day-places{position:absolute!important;inset:auto 18px 18px auto!important;width:490px!important;height:auto!important;display:grid;grid-template-columns:repeat(5,1fr);gap:6px;pointer-events:auto}
+.day-places .node{position:relative!important;left:auto!important;top:auto!important;transform:none!important;width:auto;height:62px;min-width:0;margin:0;border-radius:9px;background:rgba(255,253,231,.89);border:1px solid rgba(81,105,61,.45);color:#29422c;opacity:1}
+.day-places .node .ring{display:none}
+.day-places .node .tag{position:static!important;transform:none!important;display:flex;flex-direction:column;align-items:center;padding:4px!important;background:none!important;box-shadow:none!important;white-space:normal;font-size:11px;line-height:1.25;color:#29422c;min-width:0}
+.day-places .tag strong{font-size:13px;font-weight:500}
+.day-places .tag em{font-size:10px;order:2}
+.day-places .node.off{opacity:.62}
+.day-places .node.sel{border:2px solid #557c3b;background:#fffad5}
+.day-places .node.secret{display:block!important}
+.journey-day .stage:after{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at 27% 10%,#fff9c22b,transparent 55%)}
+.wk.wk-3d{background:none;overflow:hidden;pointer-events:none}
+body.wk-on #nodes,body.wk-on #trail,body.wk-on #signText{display:none}
+.day-places .node:focus-visible{outline:3px solid #244c3c;outline-offset:2px}
+.day-places .node.sel .tag em{color:#3a5d36}
+.wk-3d .wk-in{position:absolute;inset:0;max-width:none;width:auto!important;margin:0!important;padding:20px;justify-content:flex-end;gap:8px}
+.wk-3d .wk-svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.wk-3d .wk-summit.on{pointer-events:auto}
+.wk-3d .wk-jump{pointer-events:auto}
+.wk-3d .wk-title{position:absolute;right:28px;top:24px;color:#29422c;text-shadow:0 1px 4px white}
+.wk-3d .wk-title small{color:#29422c}
+.wk-3d .wk-days,.wk-3d .wk-status,.wk-3d .wk-offline{position:relative;pointer-events:auto;margin-left:auto;width:min(650px,100%)}
+.wk-3d .wk-d{background:rgba(255,252,232,.94);color:#29422c;min-height:84px}
+.wk-3d .wk-d.wk-future,.wk-3d .wk-d.wk-future i{color:#4b6250}
+.wk-3d .wk-status{background:rgba(255,252,232,.94)}
+.wk-records{display:flex;flex-direction:column;gap:8px}
+@media(min-width:900px){.wk-3d .wk-days{width:100%;gap:8px}.wk-3d .wk-d{min-height:72px;font-size:12px}.wk-3d .wk-status{width:100%}}
+@media(max-width:899px){
+ .head .lead{font-size:12px;line-height:1.5;margin-block:6px 10px}
+ .head h1{font-size:32px;margin-block:6px}
+ .head{padding-block:14px}
+ .journey-day .stage{overflow:visible}
+ .day-places{left:10px!important;right:10px!important;top:calc(100% + 12px)!important;bottom:auto!important;width:auto!important;grid-template-columns:repeat(3,1fr);gap:6px}
+ .day-places .node{height:68px}
+ .day-places .node .tag{font-size:10px}
+ .day-places .tag strong{font-size:12px}
+ .wk-3d .wk-in{padding:10px}
+ .wk-3d .wk-title{top:12px;right:14px}
+ .wk-3d .wk-d{font-size:11px;min-height:74px;padding:5px}
+ .wk-3d .wk-status{font-size:12px}
+ body.wk-on .stage:has(.wk-3d){overflow:visible}
+ .wk.wk-3d{overflow:visible}
+ .wk-3d .wk-records{position:absolute;top:100%;left:10px;right:10px;padding-top:12px;pointer-events:auto}
+}

@@ -11,7 +11,7 @@ let browser, fallback;
 function test(name, fn) { cases.push({ name, fn }); }
 
 async function session(at, options, fn) {
-  const context = await (options.noGL ? fallback : browser).newContext({ timezoneId: 'Asia/Seoul', viewport: { width: 960, height: 720 }, deviceScaleFactor: 0.5 });
+  const context = await (options.noGL ? fallback : browser).newContext({ timezoneId: 'Asia/Seoul', viewport: options.viewport || { width: 960, height: 720 }, deviceScaleFactor: 0.5, reducedMotion:options.reduced?'reduce':'no-preference' });
   const errors = [];
   try {
     const page = await context.newPage();
@@ -150,6 +150,7 @@ test('E18 fromCache 강제: 자동 쓰기 0회', () => session('2026-11-04T10:00
 }));
 test('E20 WebGL 없음: 모자·SVG 이동·보기 왕복', () => session('2026-11-02T10:00', { noGL: true, fixture: 'lose2' }, async p => {
   assert.equal(await p.locator('.stage.nogl').count(), 1);
+  assert.equal(await p.locator('#dayFallbackPaths path').count(), 3, '같은 세 경로를 SVG로 표시');
   assert.equal(await p.locator('#dwarf .dw-hat').evaluate(el => getComputedStyle(el).display), 'none');
   const before = await p.locator('#dwarf').getAttribute('style');
   const bodyBefore = await p.locator('#dwarf .body').evaluate(el => el.style.transform);
@@ -168,6 +169,62 @@ test('E20 WebGL 없음: 3선 첫날 발밑 트램펄린', () => session('2026-11
   assert.notEqual(await p.locator('#dwarf .dw-feet').evaluate(el => getComputedStyle(el).display), 'none');
 }));
 test('E20 WebGL 없음: E9 구간 동일', () => session('2026-11-05T10:00', { noGL: true, fixture: 'lose2', documents: { [BASE + 'days/2026-11-05']: null } }, weekSegments));
+
+test('V2 주간 3D·표시 상태·왕복 위치·기록 불변', () => session('2026-11-05T10:00', { fixture:'lose2', documents:{[BASE+'days/2026-11-05']:null} }, async (p,db) => {
+  const before=await p.evaluate(()=>({x:DW.x,z:DW.z})),writes=db.writeCount();
+  await p.click('#wkWeek');
+  assert.equal(await p.locator('#wkPanel.wk-3d').count(),1);
+  assert.equal(await p.locator('#nodes').isVisible(),false);
+  assert.equal(await p.locator('#wkDays [data-state="pending"]').count(),1);
+  assert.equal(await p.locator('#wkDays .wk-hat').count(),2);
+  assert.equal(await p.locator('#wkDays .wk-broken').count(),1);
+  assert.equal(await p.locator('#wkSummit').count(),1);
+  await p.click('#wkDay');
+  assert.deepEqual(await p.evaluate(()=>({x:DW.x,z:DW.z})),before);
+  assert.equal(await p.locator('.day-places .node').count(),10);
+  assert.equal(db.writeCount(),writes);
+}));
+test('V2 움직임 줄이기·야영 도착·두루마리', () => session('2026-11-03T10:00',{fixture:'lose3',reduced:true},async p=>{
+  const place=await p.evaluate(()=>Array.from(document.querySelectorAll('[data-place]')).map(e=>e.dataset.place).find(id=>id!==at&&id!=='sunday'));
+  assert.ok(place, '풍경 위에서 다음 장소를 직접 선택할 수 있다');
+  // A route sign and a place sign may legitimately lead to the same stop.
+  await p.locator(`[data-place="${place}"]`).first().click();await dw(p,'walking',false);
+  assert.equal(await p.evaluate(()=>at),place,'풍경 표지도 동일한 걷기 동작');
+  await p.locator('.node[data-id="camp"]').click();await dw(p,'walking',false);
+  assert.equal(await p.evaluate(()=>at),'camp');
+  assert.equal(await p.evaluate(()=>dayZone),2);
+  await p.locator('.node[data-id="camp"]').click();
+  assert.equal(await p.evaluate(()=>ov.hidden),false);
+  await p.keyboard.press('Escape');assert.equal(await p.evaluate(()=>ov.hidden),true);
+}));
+
+// Regression for critic 1: same-zone arrival used to leave the boy offscreen.
+// Test the rendered camera projection, rather than only the logical `at` value.
+for(const noGL of [false,true])for(const reduced of [false,true]){
+  test(`V2 폰 가시성·맵1/5·두루마리 GL=${!noGL} reduce=${reduced}`,()=>session('2026-11-05T07:30',{fixture:'keep',noGL,reduced,viewport:{width:400,height:820}},async(p,db)=>{
+    for(const map of [1,5]){
+      await p.evaluate(n=>window.__setMap(n),map);
+      for(const id of ['dawn','morning','lunch','camp','minimum']){
+        if(await p.evaluate(id=>at!==id,id))await p.locator(`.node[data-id="${id}"]`).click();
+        await p.waitForFunction(id=>at===id&&!walking&&(!gl||raster.done),id,{timeout:240000});
+        const visible=await p.evaluate(()=>{const p=project([DW.x,DW.y+1.8,DW.z]);return p[2]>0&&p[0]>24&&p[0]<VW.W-24&&p[1]>24&&p[1]<VW.H-24;});
+        assert.equal(visible,true,`${map}/${id}: 소년 몸 중심이 화면 안`);
+      }
+      await p.locator('.node[data-id="minimum"]').click();
+      assert.equal(await p.evaluate(()=>ov.hidden),false);
+      await p.keyboard.press('Escape');
+    }
+    assert.equal(db.writeCount(),0);
+  }));
+}
+test('V2 주간 폰 표지 충돌·pending/before/inferred/future',()=>session('2026-11-05T10:00',{fixture:'lose2',reduced:true,viewport:{width:400,height:820},documents:{[BASE+'meta/since']:{day:'2026-11-03'},[BASE+'days/2026-11-02']:null,[BASE+'days/2026-11-04']:null,[BASE+'days/2026-11-05']:null}},async(p,db)=>{
+  await p.click('#wkWeek');
+  const labels=p.locator('.wk-map-label');assert.equal(await labels.count(),7);
+  for(const state of ['before','inferred','pending','future'])assert.ok(await p.locator(`.wk-map-label[data-state="${state}"]`).count(),state);
+  const boxes=await labels.evaluateAll(els=>els.map(el=>{const r=el.getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,bottom:r.bottom};}));
+  for(let i=0;i<boxes.length;i++){const a=boxes[i];assert.ok(a.x>=0&&a.right<=400,'수평 잘림 없음');for(let j=i+1;j<boxes.length;j++){const b=boxes[j];assert.equal(a.x<b.right&&a.right>b.x&&a.y<b.bottom&&a.bottom>b.y,false,'정상·요일 표지 겹침 없음');}}
+  assert.equal(db.writeCount(),0);
+}));
 
 (async () => {
   let failed = 0;

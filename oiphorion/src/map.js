@@ -41,6 +41,8 @@ function rawH(x,z){
   return -14+E*(16+31*smooth(35,-34,z)+2*Math.exp(-(((x-18)/18)**2+((z+34)/22)**2)))+(fbm(x*.045,z*.045,2)-.5)*.8*E;
 }
 const DOM={x0:-90,z0:-115,x1:150,z1:95,res:.4};
+const terrainClock=()=>typeof performance==='undefined'?Date.now():performance.now();
+const terrainStarted=terrainClock();
 DOM.nx=Math.round((DOM.x1-DOM.x0)/DOM.res)+1; DOM.nz=Math.round((DOM.z1-DOM.z0)/DOM.res)+1;
 const HM=new Float32Array(DOM.nx*DOM.nz), SM=new Float32Array(DOM.nx*DOM.nz), QM=new Float32Array(DOM.nx*DOM.nz).fill(3);
 function sampleArr(A,x,z){ const gx=(x-DOM.x0)/DOM.res, gz=(z-DOM.z0)/DOM.res; if(gx<0||gz<0||gx>DOM.nx-1||gz>DOM.nz-1) return -60;
@@ -127,6 +129,26 @@ MAIN.slice(1).forEach((b,i)=>{ const a=MAIN[i]; EDGES.push({a,b,pts:ROAD.slice(M
 EDGES.push({a:"dawn",b:"minimum",pts:SPUR.slice(0,SEG+1)},{a:"minimum",b:"closing",pts:SPUR.slice(SEG)},{a:"dawn",b:"lunch",pts:SIDE,side:true});
 EDGES.forEach(e=>{ e.len=plen(e.pts); e.cost=e.side?e.len*.7:e.len; });  // 샛길은 지름길이라 열려 있으면 먼저 고른다
 
+/* Scene resources share path topology, but never change progression data. */
+let sceneMode="day", dayZone=0;
+const mountainHM=HM.slice(), mountainSM=SM.slice();
+const meadowHM=Float32Array.from(HM,(_,k)=>MAP_SCENES.dayHeight(DOM.x0+(k%DOM.nx)*DOM.res,DOM.z0+Math.floor(k/DOM.nx)*DOM.res));
+HM.set(meadowHM); SM.fill(8);
+window.__sceneTimings={terrainMs:terrainClock()-terrainStarted};
+let terrainTexture=null, cloudTextureHandle=null, weekCloudReady=false;
+function ensureWeekCloud(){
+  if(!gl||weekCloudReady||sceneMode!=="week")return;
+  const ct=cloudTexture(512);gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,cloudTextureHandle);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,ct.N,ct.N,0,gl.RGBA,gl.UNSIGNED_BYTE,ct.data);weekCloudReady=true;
+}
+function uploadSceneTerrain(){
+  HM.set(sceneMode==="day"?meadowHM:mountainHM);SM.set(sceneMode==="day"?new Float32Array(SM.length).fill(8):mountainSM);
+  if(!gl||!terrainTexture)return;
+  ensureWeekCloud();
+  const data=new Uint8Array(HM.length*4);
+  for(let k=0;k<HM.length;k++){const h=Math.round((HM[k]+60)/100*65535);data[k*4]=h>>8;data[k*4+1]=h&255;data[k*4+2]=Math.round(Math.min(QM[k],3)/3*255);data[k*4+3]=Math.round((Math.max(-8,Math.min(8,SM[k]))+8)/16*255);}
+  gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,terrainTexture);gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,DOM.nx,DOM.nz,gl.RGBA,gl.UNSIGNED_BYTE,data);bindScenery();
+}
 /* 물건들 */
 const nodeY=id=>groundY(NXZ[id][0],NXZ[id][1])+.24;
 const TREES=[[-39,35,1.2],[-18,43,1],[2,45,.85],[26,40,.95],[44,29,.85],[46,9,.75],[-33,21,.8],[-12,16,.7]];
@@ -175,6 +197,8 @@ function setCamera(){
   if(asp>=1.25){ ro=[-26,45,112]; ta=[3,16,3]; fl=2.; }
   else if(asp>=.85){ ro=[-34,49,116]; ta=[2,18,2]; fl=1.9; }
   else { ro=[-35,64,110]; ta=[4,18,2]; fl=1.35*Math.max(.9,Math.min(1.1,asp/.57)); }
+  if(sceneMode==="day"){const c=MAP_SCENES.camera(at,NXZ,groundY,asp);({ro,ta,fl}=c);dayZone=c.zone;}
+  if(sceneMode==='day'&&!gl){ro=[-8,85,100];ta=[2,0,4];fl=asp<.85?1.05:1.8;}
   const cw=v3.norm(v3.sub(ta,ro)), cu=v3.norm(v3.cross(cw,[0,1,0])), cv=v3.cross(cu,cw);
   CAM={ro,ta,fl,cw,cu,cv};
 }
@@ -187,10 +211,11 @@ const glslFloat=n=>{if(!Number.isFinite(n))throw new Error('Non-finite scenery c
 const glslColor=a=>'vec3('+a.map(glslFloat).join(',')+')';
 function makeFS(M){
   if(!Number.isInteger(M.treeCount)||M.treeCount<0||M.treeCount>8)throw new Error('Invalid tree count');
+  M=sceneMode==='day'?{...MAPS[0],treeCount:MAP_SCENES.dayTrees.length}:M;
   return `precision highp float;
-uniform vec2 uRes; uniform vec3 uRo,uCu,uCv,uCw; uniform float uFl;
+const float uDay=${sceneMode==='day'?'1.':'0.'}; uniform vec2 uRes; uniform vec3 uRo,uCu,uCv,uCw; uniform float uFl;
 uniform sampler2D uHm, uCl; uniform vec2 uHN; uniform vec4 uDom; uniform vec3 uL;
-uniform vec4 uNodes[10]; uniform vec4 uTrees[24]; uniform vec4 uRocks[6];
+uniform vec4 uNodes[10]; uniform vec4 uTrees[48]; uniform vec4 uRocks[6];
 uniform vec3 uTent, uSign, uFlag, uDoor; uniform float uSignRot;
 uniform vec4 uDw, uDw2;  // 난쟁이: 발 위치 xyz · 바라보는 방향 / 크기 · 찌그러짐 · 켜짐 · 뜬 높이
 uniform vec4 uDw3;  // 모자 씀 · 트램펄린을 발밑에(3선) · 트램펄린 위로 튄 높이 · 트램펄린 없음(그 주에 잃음)
@@ -227,6 +252,28 @@ float ch(vec2 xz){return CY+cl(xz).r*CA;}
 // 세 층의 산맥은 하늘에서 계산한다. 추가 레이마칭이나 FBM은 없다.
 vec3 sky(vec3 rd){
   float e=rd.y,az=atan(rd.x,-rd.z);
+  if(uDay>.5){
+    vec3 c=mix(vec3(.55,.76,.83),vec3(.16,.39,.88),smoothstep(-.05,.7,e));
+    vec2 cp=vec2(mod(az+.65,1.3)-.65,(e-.35)*1.8);
+    float puff=min(length(cp)-.16,min(length(cp-vec2(.14,.04))-.12,length(cp+vec2(.13,.02))-.13));
+    float clouds=1.-smoothstep(-.012,.022,puff);
+    c=mix(c,mix(vec3(.70,.77,.88),vec3(1.,.98,.96),smoothstep(.20,.48,e)),clouds*.94);
+    float moon=1.-smoothstep(.024,.029,length(vec2(az+.48,e-.43)));c=mix(c,vec3(.95,.98,1.),moon*.85);
+    c+=vec3(.15,.10,.04)*pow(max(0.,dot(rd,normalize(vec3(-.62,.66,.42)))),18.);
+    // Two distant woodland layers close the open horizon, without ray objects.
+    float ridge=.028+.025*vn(vec2(az*17.,4.))+.012*sin(az*51.);
+    c=mix(c,vec3(.24,.38,.27),1.-smoothstep(ridge,ridge+.008,e));
+    c=mix(c,vec3(.12,.26,.13),1.-smoothstep(ridge-.025,ridge-.018,e));
+    // A single white doorway rests on a tiny cloud in the open sky.
+    vec2 dream=vec2(dot(rd,uCu),dot(rd,uCv))/max(.01,dot(rd,uCw));
+    vec2 door=dream-vec2(.12,.29);
+    float frame=(1.-smoothstep(.012,.015,abs(door.x)))*(1.-smoothstep(.030,.033,abs(door.y)));
+    float cloudlet=1.-smoothstep(.85,1.05,length((dream-vec2(.12,.25))/vec2(.062,.018)));
+    c=mix(c,vec3(.96,.95,1.),cloudlet*.96);
+    c=mix(c,vec3(1.,.99,.95),frame);
+    c=mix(c,vec3(.68,.78,.89),frame*(1.-smoothstep(.001,.003,abs(door.x-.008)))*.6);
+    return c;
+  }
   vec3 c=mix(vec3(.600,.720,.800),vec3(.025,.150,.300),smoothstep(-.04,.30,e));
   float cloudNoise=vn(vec2(az*9.,e*18.));
   vec2 cp=vec2(az*1.9,(e-.18)*4.5);
@@ -333,17 +380,26 @@ float lostHat(vec3 p){vec3 q=(p-uHat.xyz)/uDw2.x;float b=length(q-vec3(.15,0.,.1
   float t=sdEll(h-vec3(-.035,.04,-.055),vec3(.64,.285,.54));
   t=smin(t,sdEll(h-vec3(0.,-.125,.015),vec3(.565,.065,.49)),.025);
   t=min(t,sdEll(h-vec3(0.,-.105,.455),vec3(.5,.055,.285)));return t*uDw2.x;}
-vec2 obj(vec3 p){
+vec2 obj(vec3 p,float foliage){
   float d=1e5,id=0.;
-  for(int i=0;i<10;i++){vec3 q=p-uNodes[i].xyz;float b=length(q)-1.7;float dd=b>.4?b:sdNode(q);if(dd<d){d=dd;id=10.+float(i);}}
-  for(int i=0;i<${M.treeCount};i++){vec4 a=uTrees[i*3];float s=a.w/1.45;vec3 q=p-a.xyz+vec3(0.,2.35*s,0.);
+  for(int i=0;i<10;i++){vec3 q=p-uNodes[i].xyz;float b=length(q)-3.;float dd=b>.4?b:sdNode(q);if(uDay>.5&&b<.4)dd=min(sdBox(q-vec3(0.,.7,0.),vec3(.09,.9,.09)),sdBox(q-vec3(0.,1.7,0.),vec3(.8,.32,.12)));if(dd<d){d=dd;id=10.+float(i);}}
+  if(foliage>.5){for(int i=0;i<${M.treeCount};i++){vec4 a=uTrees[i*3];float s=a.w/1.45;vec3 q=p-a.xyz+vec3(0.,2.35*s,0.);
     float bb=length(q-vec3(0.,2.85*s,0.))-3.2*s;float dd=bb;
     // 두 capped cone의 보수적 거리. 줄기와 수관은 같은 모양을 유지하고 모서리 거리 계산을 줄인다.
     if(bb<.5){vec3 v=q/s;float r=length(v.xz);
       float low=max((r-.765+(v.y-2.35)*.415152)*.9236,abs(v.y-2.35)-1.65);
       float high=max((r-.535+(v.y-4.35)*.381481)*.9343,abs(v.y-4.35)-1.35);
-      dd=min(min(low,high),sdBox(v-vec3(0.,.55,0.),vec3(.10,.55,.10)))*s;}
-    if(dd<d){d=dd;id=2.;}}
+      dd=min(min(low,high),sdBox(v-vec3(0.,.55,0.),vec3(.10,.55,.10)))*s;
+      if(uDay>.5){
+        // Three unequal crowns form an open woodland canopy; static scallops
+        // keep the silhouette leafy without adding objects or shadow rays.
+        float crown=min(sdEll(v-vec3(-.65,3.15,.15),vec3(1.65,1.25,1.5)),min(sdEll(v-vec3(.65,4.05,.1),vec3(1.45,1.25,1.3)),sdEll(v-vec3(.7,2.95,-.6),vec3(1.2,1.1,1.35))));
+        // Broad irregular masses, with a low understorey closing the verge.
+        crown+=.025*(sin(v.x*17.+v.z*13.)*sin(v.y*19.-v.z*9.));
+        crown=min(crown,sdEll(v-vec3(.5,.55,-.4),vec3(.95,.65,.85)));
+        dd=min(crown,sdBox(v-vec3(0.,1.25,0.),vec3(.10,1.25,.10)))*s;
+      }}
+    if(dd<d){d=dd;id=2.;}}}
   for(int i=0;i<${ROCKS.length};i++){vec4 a=uRocks[i];vec3 q=rotY(p-a.xyz,.37+float(i)*.71);float bb=length(q)-2.;
     float dd=bb>.3?bb:sdBox(q,vec3(1.35,.85,1.05))-.16;if(dd<d){d=dd;id=1.;}}
   {vec3 q=p-uTent;float b=length(q+vec3(0.,1.7,0.))-3.;float dd=b>.3?b:sdCone(q,vec2(.5,.866),3.4);if(dd<d){d=dd;id=4.;}}
@@ -363,10 +419,30 @@ vec2 obj(vec3 p){
   if(uHat.w>.5){float h=lostHat(p);if(h<d){d=h;id=21.;}}
   return vec2(d,id);
 }
-vec3 objN(vec3 p){vec2 e=vec2(.004,-.004);return normalize(e.xyy*obj(p+e.xyy).x+e.yyx*obj(p+e.yyx).x+e.yxy*obj(p+e.yxy).x+e.xxx*obj(p+e.xxx).x);}
+float objNormalDistance(vec3 p){return obj(p,${sceneMode==='day'?'0.':'1.'}).x;}
+vec3 objN(vec3 p){vec2 e=vec2(.004,-.004);return normalize(e.xyy*objNormalDistance(p+e.xyy)+e.yyx*objNormalDistance(p+e.yyx)+e.yxy*objNormalDistance(p+e.yxy)+e.xxx*objNormalDistance(p+e.xxx));}
+vec3 canopyN(vec3 p){
+  float best=1e5;vec3 n=vec3(0.,1.,0.);
+  for(int i=0;i<${M.treeCount};i++){
+    vec4 a=uTrees[i*3];float s=a.w/1.45;vec3 v=(p-a.xyz)/s+vec3(0.,2.35,0.);
+    for(int j=0;j<4;j++){
+      vec3 c,r;
+      if(j==0){c=vec3(-.65,3.15,.15);r=vec3(1.65,1.25,1.5);}
+      else if(j==1){c=vec3(.65,4.05,.1);r=vec3(1.45,1.25,1.3);}
+      else if(j==2){c=vec3(.7,2.95,-.6);r=vec3(1.2,1.1,1.35);}
+      else{c=vec3(.5,.55,-.4);r=vec3(.95,.65,.85);}
+      vec3 q=v-c;float d=abs(length(q/r)-1.)*s;
+      if(d<best){best=d;n=q/(r*r);}
+    }
+    if(v.y<2.5&&length(v.xz)<.16){best=0.;n=vec3(v.x,0.,v.z);}
+  }
+  return normalize(n);
+}
 float shadow(vec3 p,float withDw){
   float res=1.,t=.25;
-  for(int i=0;i<56;i++){vec3 q=p+uL*t;if(q.y>42.)break;float h=q.y-hm(q.xz);res=min(res,9.*h/t);if(res<.01)break;t+=clamp(h*.45,.2,5.);}
+  // Day hills have a maximum slope below .06; the high sun cannot be occluded by them.
+  // Keep tree, sign and character shadows, but avoid 56 terrain probes on the meadow.
+  if(uDay<.5){for(int i=0;i<56;i++){vec3 q=p+uL*t;if(q.y>42.)break;float h=q.y-hm(q.xz);res=min(res,9.*h/t);if(res<.01)break;t+=clamp(h*.45,.2,5.);}}
   for(int i=0;i<${M.treeCount*3};i++){vec4 tr=uTrees[i];vec3 oc=tr.xyz-p;float b=dot(oc,uL);if(b>0.){float dd=length(oc-uL*b)-tr.w;res=min(res,clamp(.5+dd*2./max(b,.5)*2.,0.,1.));}}
   for(int i=0;i<10;i++){vec3 oc=uNodes[i].xyz-p;float b=dot(oc,uL);if(b>0.&&b<6.){float dd=length(oc-uL*b)-1.4;res=min(res,clamp(.4+dd*3.,0.,1.));}}
   if(withDw>.5&&uDw2.z>.5){float s=uDw2.x;
@@ -399,14 +475,15 @@ vec3 shadeGround(vec3 p,vec3 rd,float t){
   vec4 path=texture2D(uPath,(g+.5)/uHN);
   vec2 pq=path.rg*3.;
   float road=1.-smoothstep(.80,1.12,q);
-  float side=(1.-smoothstep(.72,1.1,pq.x))*mix(.16,1.,uPathOn.x);
-  float spur=(1.-smoothstep(.7,1.08,pq.y))*mix(.12,1.,uPathOn.y);
+  float side=uDay*(1.-smoothstep(.72,1.1,pq.x))*mix(.16,1.,uPathOn.x);
+  float spur=uDay*(1.-smoothstep(.7,1.08,pq.y))*mix(.12,1.,uPathOn.y);
   float trail=max(road,max(side,spur));
   // 밝은 석회암 자갈. 패임 없이 가는 등산로로 이어진다.
   vec3 gravel=mix(vec3(.20,.19,.16),vec3(.49,.48,.43),1.-smoothstep(.15,1.2,min(q,min(pq.x,pq.y))));
   gravel*=.94+.12*n2;
+  if(uDay>.5){alb=mix(vec3(.045,.13,.018),vec3(.19,.34,.045),n2*.6+n1*.4);gravel=mix(vec3(.31,.24,.13),vec3(.60,.50,.30),n2);gravel=mix(gravel,vec3(.11,.24,.035),side*.85);}
   alb=mix(alb,gravel,trail);
-  float snow=smoothstep(SNOW_START,SNOW_END,h)*smoothstep(.35,.78,n.y);
+  float snow=(1.-uDay)*smoothstep(SNOW_START,SNOW_END,h)*smoothstep(.35,.78,n.y);
   alb=mix(alb,SNOW,snow);
   float branchOn=max((1.-smoothstep(1.3,2.2,pq.x))*uPathOn.x,(1.-smoothstep(1.3,2.2,pq.y))*uPathOn.y);
   float compacted=max(trail*.22,max(path.b,path.a*branchOn));
@@ -422,6 +499,13 @@ vec3 shadeGround(vec3 p,vec3 rd,float t){
   if(uHat.w>.5)ao*=mix(.6,1.,smoothstep(.3,1.5,length(p.xz-uHat.xz-vec2(.15*uDw2.x,.1*uDw2.x))));
   if(uDw2.z>.5){float dd=length(p.xz-uDw.xz)/uDw2.x;ao*=mix(mix(.42,.9,clamp(uDw2.w*.7,0.,1.)),1.,smoothstep(.35,1.3,dd));}
   float dif=max(dot(n,uL),0.)*shadow(p+n*.08,1.);
+  if(uDay>.5){
+    // Dapple only beneath the crowns. The flower clearing stays sunlit.
+    float canopy=0.;
+    for(int i=0;i<${M.treeCount*3};i+=3){vec4 tr=uTrees[i];canopy=max(canopy,1.-smoothstep(tr.w,tr.w*2.7,length(p.xz-tr.xz-vec2(1.8,-1.2))));}
+    float leaves=smoothstep(.35,.65,vn(p.xz*1.3)+.22*vn(p.xz*3.8));
+    dif*=mix(1.,mix(.46,1.,leaves),canopy);ao=max(.62,ao);
+  }
   vec3 col=alb*(SUN*dif+AMB*(.55+.45*n.y)*ao+lin(vec3(.5,.62,.4))*.12*max(-n.y,0.));
   col+=alb*AMB*.12*pow(1.-max(dot(n,-rd),0.),3.);
   // 눈 표면도 사면의 방향과 층리가 읽히도록 지면에서만 반사량을 조절한다.
@@ -442,7 +526,9 @@ vec3 shadeCloud(vec3 p,vec3 rd,float t){
   return col;
 }
 vec3 shadeObj(vec3 p,vec3 rd,float id,float t){
-  vec3 n=objN(p);
+  // Canopy normals do not need four complete scene SDF evaluations. The boy,
+  // his cap and trampoline retain their original precise tetrahedral normal.
+  vec3 n=uDay>.5&&id>1.5&&id<2.5?canopyN(p):objN(p);
   float sh=shadow(p+n*.06,0.);
   float dif=max(dot(n,uL),0.)*sh;
   vec3 alb=vec3(.5);float spec=0.,gloss=8.,emi=0.;
@@ -499,7 +585,8 @@ vec3 shadeObj(vec3 p,vec3 rd,float id,float t){
   } else if(id<2.5){
     float v=vn(p.xz*1.7+p.y*1.3)*.6+vn(p.xz*4.3-p.y*3.1)*.4;
     alb=mix(TREE_DARK,TREE,v*.7+smoothstep(-.2,.9,n.y)*.35);
-    n=normalize(n+vec3(v-.5)*.35);dif=max(dot(n,uL),0.)*sh;spec=.05;gloss=6.;
+    if(uDay>.5)alb=mix(vec3(.025,.085,.018),vec3(.16,.29,.045),v*.55+max(n.y,0.)*.35);
+    n=normalize(n+vec3(v-.5)*.16);dif=max(dot(n,uL),0.)*sh;spec=.015;gloss=6.;
   } else if(id<3.5){alb=lin(vec3(.48,.34,.22));
   } else if(id<4.5){vec3 q=p-uTent;float an=atan(q.z,q.x);alb=mix(lin(vec3(.93,.25,.18)),lin(vec3(.98,.95,.88)),step(.5,fract(an/6.2832*8.)));if(q.y<-3.25)alb*=.6;
   } else if(id<5.5){alb=lin(vec3(.80,.82,.84));spec=.6;gloss=40.;
@@ -521,7 +608,14 @@ void main(){
   float t=.5,tp=.5,hit=-1.;float kind=0.;
   if(ro.y>44.&&rd.y<0.) t=max(t,(44.-ro.y)/rd.y);
   tp=t;
-  for(int i=0;i<230;i++){
+  // The meadow has no cliffs: intersect its low relief directly, then refine.
+  // The mountain retains the conservative terrain marcher below.
+  if(uDay>.5&&rd.y<-.008){
+    t=-ro.y/rd.y;
+    for(int i=0;i<5;i++){vec3 p=ro+rd*t;t=(.8*sin(p.x*.045)+.55*cos(p.z*.06)-ro.y)/rd.y;}
+    if(t>.5&&t<300.){hit=t;kind=1.;}
+  }
+  for(int i=0;i<${sceneMode==='day'?0:230};i++){
     vec3 p=ro+rd*t;
     if(rd.y>0.&&p.y>45.)break;
     float ht=hm(p.xz);float hc=p.y<CY+CA+.2?ch(p.xz):-1e3;
@@ -538,7 +632,7 @@ void main(){
   float tn=max(max(tmn.x,tmn.y),tmn.z),tf=min(min(tmx.x,tmx.y),tmx.z);
   float oid=0.,ot=-1.;
   if(tf>max(tn,0.)){float tt=max(tn,.5);float lim=hit>0.?min(tf,hit):tf;
-    for(int i=0;i<160;i++){vec2 o=obj(ro+rd*tt);if(o.x<(o.y>19.5?.0004:.0015)*tt){ot=tt;oid=o.y;break;}tt+=o.x*.9;if(tt>lim)break;}}
+    for(int i=0;i<160;i++){vec2 o=obj(ro+rd*tt,1.);if(o.x<(o.y>19.5?.0004:.0015)*tt){ot=tt;oid=o.y;break;}tt+=o.x*.9;if(tt>lim)break;}}
   vec3 col;
   if(ot>0.){col=shadeObj(ro+rd*ot,rd,oid,ot);col=fogit(col,ot,rd);}
   else if(hit>0.){vec3 p=ro+rd*hit;col=kind<1.5?fogit(shadeGround(p,rd,hit),hit,rd):mix(fogit(shadeCloud(p,rd,hit),hit,rd),sky(rd),smoothstep(260.,650.,hit));}
@@ -557,7 +651,8 @@ void main(){
 
 /* ───── 렌더러 ───── */
 const stageEl=document.getElementById("stage"), cv=document.getElementById("gl");
-let gl=null, prog=null, vertexBuffer=null, compiledMap=0, U={}, raster={band:0,y:0,raf:0,done:false};
+let gl=null, prog=null, vertexBuffer=null, compiledMap=0, compiledScene='', U={}, raster={band:0,y:0,raf:0,done:false};
+const scenePrograms=new Map();
 function initGL(){
   try{ gl=cv.getContext("webgl",{preserveDrawingBuffer:true,antialias:false,alpha:false}); }catch(e){ gl=null; }
   if(!gl){ stageEl.classList.add("nogl"); return false; }
@@ -567,12 +662,12 @@ function initGL(){
   // 높이 지도
   const hd=new Uint8Array(DOM.nx*DOM.nz*4);
   for(let k=0;k<HM.length;k++){ const v=Math.round(Math.max(0,Math.min(1,(HM[k]+60)/100))*65535); hd[k*4]=v>>8; hd[k*4+1]=v&255; hd[k*4+2]=Math.round(Math.min(QM[k],3)/3*255); hd[k*4+3]=Math.round((Math.max(-8,Math.min(8,SM[k]))+8)/16*255); }
-  const t0=gl.createTexture(); gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,t0);
+  const t0=gl.createTexture(); terrainTexture=t0; gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,t0);
   gl.pixelStorei(gl.UNPACK_ALIGNMENT,1);
   gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,DOM.nx,DOM.nz,0,gl.RGBA,gl.UNSIGNED_BYTE,hd);
   [gl.TEXTURE_MIN_FILTER,gl.TEXTURE_MAG_FILTER].forEach(p=>gl.texParameteri(gl.TEXTURE_2D,p,gl.NEAREST));
   [gl.TEXTURE_WRAP_S,gl.TEXTURE_WRAP_T].forEach(p=>gl.texParameteri(gl.TEXTURE_2D,p,gl.CLAMP_TO_EDGE));
-  const ct=cloudTexture(512), t1=gl.createTexture(); gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D,t1);
+  const ct={N:1,data:new Uint8Array([128,128,128,128])}, t1=gl.createTexture(); cloudTextureHandle=t1; gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D,t1);
   gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,ct.N,ct.N,0,gl.RGBA,gl.UNSIGNED_BYTE,ct.data);
   [gl.TEXTURE_MIN_FILTER,gl.TEXTURE_MAG_FILTER].forEach(p=>gl.texParameteri(gl.TEXTURE_2D,p,gl.LINEAR));
   [gl.TEXTURE_WRAP_S,gl.TEXTURE_WRAP_T].forEach(p=>gl.texParameteri(gl.TEXTURE_2D,p,gl.REPEAT));
@@ -583,13 +678,15 @@ function initGL(){
   gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,DOM.nx,DOM.nz,0,gl.RGBA,gl.UNSIGNED_BYTE,pd);
   [gl.TEXTURE_MIN_FILTER,gl.TEXTURE_MAG_FILTER].forEach(p=>gl.texParameteri(gl.TEXTURE_2D,p,gl.LINEAR));
   [gl.TEXTURE_WRAP_S,gl.TEXTURE_WRAP_T].forEach(p=>gl.texParameteri(gl.TEXTURE_2D,p,gl.CLAMP_TO_EDGE));
-  bindScenery();
+  ensureWeekCloud();bindScenery();
   dw.hidden=true;  // WebGL이 되면 난쟁이는 셰이더가 그린다. 안 되면 SVG가 남는다
   return true;
 }
 // 컴파일·링크 성공 뒤에만 교체한다. 실패하면 이전 프로그램과 진행 기록을 유지한다.
 function useMapProgram(n){
-  let next=null,shaders=[];
+  const key=sceneMode==='day'?'day':`week-${n}`,cached=scenePrograms.get(key);
+  if(cached){({prog,U}=cached);gl.useProgram(prog);compiledMap=n;compiledScene=sceneMode;bindScenery();return true;}
+  let next=null,shaders=[];const compileStarted=performance.now();
   try{
     next=gl.createProgram();
     for(const [type,source] of [[gl.VERTEX_SHADER,VS],[gl.FRAGMENT_SHADER,makeFS(MAPS[n-1])]]){
@@ -597,40 +694,46 @@ function useMapProgram(n){
       if(!gl.getShaderParameter(sh,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(sh));gl.attachShader(next,sh);
     }
     gl.linkProgram(next);if(!gl.getProgramParameter(next,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(next));
-    const uniforms={};for(const name of ['uRes','uRo','uCu','uCv','uCw','uFl','uHm','uCl','uHN','uDom','uL','uNodes','uTrees','uRocks','uTent','uSign','uFlag','uDoor','uSignRot','uDw','uDw2','uDw3','uHat','uPath','uPathOn'])uniforms[name]=gl.getUniformLocation(next,name);
+    const uniforms={};for(const name of ['uDay','uRes','uRo','uCu','uCv','uCw','uFl','uHm','uCl','uHN','uDom','uL','uNodes','uTrees','uRocks','uTent','uSign','uFlag','uDoor','uSignRot','uDw','uDw2','uDw3','uHat','uPath','uPathOn'])uniforms[name]=gl.getUniformLocation(next,name);
     const loc=gl.getAttribLocation(next,'a'),old=prog;
     gl.useProgram(next);gl.bindBuffer(gl.ARRAY_BUFFER,vertexBuffer);gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
-    prog=next;U=uniforms;compiledMap=n;bindScenery();
-    if(old)gl.deleteProgram(old);return true;
+    prog=next;U=uniforms;compiledMap=n;compiledScene=sceneMode;bindScenery();
+    scenePrograms.set(key,{prog,U});return true;
   }catch(e){if(next)gl.deleteProgram(next);if(prog)gl.useProgram(prog);console.warn('풍경 프로그램 유지:',e.message);return false;}
-  finally{for(const sh of shaders)gl.deleteShader(sh);}
+  finally{for(const sh of shaders)gl.deleteShader(sh);window.__sceneTimings[sceneMode+'CompileMs']=performance.now()-compileStarted;}
 }
 function bindScenery(){
   gl.uniform1i(U.uHm,0); gl.uniform1i(U.uCl,1); gl.uniform1i(U.uPath,2);
   gl.uniform2f(U.uHN,DOM.nx,DOM.nz); gl.uniform4f(U.uDom,DOM.x0,DOM.z0,DOM.x1-DOM.x0,DOM.z1-DOM.z0);
   const L=v3.norm([-.62,.66,.42]); gl.uniform3f(U.uL,L[0],L[1],L[2]);
-  const tr=[]; TREES.forEach(([x,z,s])=>{ const y=groundY(x,z); tr.push(x,y+2.35*s,z,1.45*s,x,y+4.35*s,z,1.05*s,x,y+.55*s,z,.15*s); });
-  gl.uniform4fv(U.uTrees,new Float32Array(tr.slice(0,MAPS[compiledMap-1].treeCount*12)));
+  gl.uniform1f(U.uDay,sceneMode==="day"?1:0);
+  const tr=[];window.__dayTreeMask=[];
+  (sceneMode==="day"?MAP_SCENES.dayTrees:TREES).forEach(([x,z,s])=>{let y=groundY(x,z);
+    if(sceneMode==='day'){const clear=MAP_SCENES.treeClear([x,z,s],CAM.ro,[DW.x,DW.y+1.8,DW.z],groundY);window.__dayTreeMask.push(clear);if(!clear)y=-200;}
+    tr.push(x,y+2.35*s,z,1.45*s,x,y+4.35*s,z,1.05*s,x,y+.55*s,z,.15*s); });
+  gl.uniform4fv(U.uTrees,new Float32Array(tr.slice(0,(sceneMode==='day'?MAP_SCENES.dayTrees.length:MAPS[compiledMap-1].treeCount)*12)));
   const rocks=[];ROCKS.forEach(([x,z])=>rocks.push(x,groundY(x,z)+.45,z,1));gl.uniform4fv(U.uRocks,new Float32Array(rocks));
   gl.uniform3f(U.uTent,TENT[0],groundY(TENT[0],TENT[1])+3.35,TENT[1]);
-  gl.uniform3f(U.uSign,SIGN[0],groundY(SIGN[0],SIGN[1])-.05,SIGN[1]);
+  gl.uniform3f(U.uSign,SIGN[0],sceneMode==='day'?-200:groundY(SIGN[0],SIGN[1])-.05,SIGN[1]);
   gl.uniform3f(U.uFlag,FLAG[0],groundY(FLAG[0],FLAG[1])-.1,FLAG[1]);
-  gl.uniform3f(U.uDoor,DOOR[0],CLOUD_Y+2.6,DOOR[1]);
+  if(sceneMode==="day"){const d=CAM.ro.map((v,i)=>v+CAM.cw[i]*95);gl.uniform3f(U.uDoor,d[0]+14,21,d[2]);}else gl.uniform3f(U.uDoor,DOOR[0],CLOUD_Y+2.6,DOOR[1]);
  }
 function nodeUniforms(){
   if(!gl) return;
   const a=[]; NODE_ORDER.forEach(id=>{ const b=byId(id); let k=0;
     if(id==="sunday") k=4; else if(id==="minimum") k=state.line===3?3:2; else if(isOff(b)) k=1;
-    a.push(NXZ[id][0],nodeY(id),NXZ[id][1],k); });
+    a.push(NXZ[id][0]+1.5,sceneMode==="week"?-1000:nodeY(id),NXZ[id][1]+1,k); });
   gl.useProgram(prog); gl.uniform4fv(U.uNodes,new Float32Array(a));
 }
 function render(){
   if(!gl) return;
-  if(mapNo!==compiledMap&&!useMapProgram(mapNo))mapNo=compiledMap;
+  if((mapNo!==compiledMap||sceneMode!==compiledScene)&&!useMapProgram(mapNo))mapNo=compiledMap;
+  bindScenery();
   cancelAnimationFrame(raster.raf);
-  const dpr=Math.min(window.devicePixelRatio||1,1.5);
+  const renderStart=performance.now();
+  const dpr=Math.min(window.devicePixelRatio||1,1);
   let w=Math.round(VW.W*dpr), h=Math.round(VW.H*dpr);
-  const cap=2.3e6; if(w*h>cap){ const k=Math.sqrt(cap/(w*h)); w=Math.round(w*k); h=Math.round(h*k); }
+  const cap=sceneMode==="day"?420000:650000; if(w*h>cap){ const k=Math.sqrt(cap/(w*h)); w=Math.round(w*k); h=Math.round(h*k); }
   cv.width=w; cv.height=h; gl.viewport(0,0,w,h);
   gl.uniform2f(U.uRes,w,h); gl.uniform3fv(U.uRo,CAM.ro); gl.uniform3fv(U.uCu,CAM.cu); gl.uniform3fv(U.uCv,CAM.cv); gl.uniform3fv(U.uCw,CAM.cw); gl.uniform1f(U.uFl,CAM.fl);
   gl.uniform1f(U.uSignRot,Math.atan2(CAM.ro[0]-SIGN[0],CAM.ro[2]-SIGN[1]));
@@ -638,7 +741,7 @@ function render(){
   gl.enable(gl.SCISSOR_TEST);
   const band=Math.max(6,Math.floor(140000/w)); let y=h; raster.done=false; stageEl.classList.add("painting");
   const step=()=>{ const y0=Math.max(0,y-band); gl.scissor(0,y0,w,y-y0); gl.drawArrays(gl.TRIANGLES,0,3); y=y0;
-    if(y>0) raster.raf=requestAnimationFrame(step); else { raster.done=true; stageEl.classList.remove("painting"); if(DW.dirty) drawDwarf(); window.__rendered=(window.__rendered||0)+1; } };
+    if(y>0) raster.raf=requestAnimationFrame(step); else { gl.finish(); window.__renderMs=performance.now()-renderStart; if(!window.__firstRenderMs)window.__firstRenderMs=performance.now(); window.__renderScene=sceneMode; raster.done=true; stageEl.classList.remove("painting"); if(DW.dirty) drawDwarf(); window.__rendered=(window.__rendered||0)+1; } };
   raster.raf=requestAnimationFrame(step);
 }
 
@@ -648,6 +751,15 @@ let at="dawn", sel="dawn", walking=null;
 const P3=(x,z,dy)=>[x,groundY(x,z)+(dy||0),z];
 function buildOverlay(){
   svg.setAttribute("viewBox","0 0 "+VW.W+" "+VW.H);
+  if(gl)document.getElementById("dayFallbackPaths")?.remove();
+  if(!gl){
+    let fallback=document.getElementById("dayFallbackPaths");
+    if(!fallback){fallback=document.createElementNS("http://www.w3.org/2000/svg","g");fallback.id="dayFallbackPaths";svg.prepend(fallback);}
+    fallback.innerHTML=[ROAD,SIDE,SPUR].map((path,i)=>{
+      const points=path.map(p=>project(P3(...p,.08))).filter(p=>p[2]>2);
+      return `<path d="${points.length?'M'+points.map(p=>p.slice(0,2).join(' ')).join(' L'):''}" fill="none" stroke="${['#eee0b7','#a8bd65','#b28c55'][i]}" stroke-width="${[14,9,5][i]}" stroke-linecap="round"/>`;
+    }).join('');
+  }
   const sp=SPUR.map(([x,z])=>project(P3(x,z,.08)));
   document.getElementById("spur").setAttribute("d","M"+sp.map(p=>p[0].toFixed(1)+" "+p[1].toFixed(1)).join(" L"));
   nodesEl.innerHTML=NODE_ORDER.map(id=>{ const b=byId(id), [x,z]=NXZ[id], c=project([x,nodeY(id),z]);
@@ -658,6 +770,25 @@ function buildOverlay(){
     return '<button class="node'+(up?" up":"")+side+'" data-id="'+id+'" style="left:'+c[0].toFixed(1)+'px;top:'+c[1].toFixed(1)+'px;--rx:'+rx.toFixed(1)+'px;--ry:'+ry.toFixed(1)+'px" aria-label="'+b.name+', '+blockTime(b)+'">'+
       '<span class="ring"></span><span class="tag"><em>'+t+'</em>'+(b.short||SHORT[id])+'<i class="nw">지금</i></span></button>';
   }).join("");
+  nodesEl.classList.toggle("day-places",sceneMode==="day");
+  const markers=[],used=[];
+  if(sceneMode==='day'){
+    const candidates=[{id:at,label:SHORT[at]},...NODE_ORDER.filter(id=>id!==at).map(id=>({id,label:SHORT[id]}))];
+    if(at==='dawn'||at==='minimum'){
+      [[ROAD,'morning','1선 · 흙 큰길'],[SIDE,'lunch','2선 · 들꽃 샛길'],[SPUR,'minimum','3선 · 최소 기준선']].forEach(([path,id,label],i)=>{
+        const p=path[Math.floor(path.length*(i===0?.045:.22))];candidates.unshift({id,label,point:p,route:i+1});
+      });
+    }
+    for(const c of candidates){const [x,z]=c.point||NXZ[c.id],p=project(P3(x+1.5,z+1,2.5)),w=c.route?138:66;
+      if(p[2]<4||p[2]>150||p[0]<w/2+8||p[0]>VW.W-w/2-8||p[1]<VW.H*.32||p[1]>VW.H-75)continue;
+      let y=p[1];while(used.some(b=>Math.abs(b.x-p[0])<(b.w+w)/2+6&&Math.abs(b.y-y)<38))y-=40;
+      if(y<VW.H*.28)continue;used.push({x:p[0],y,w});
+      markers.push(`<button type="button" data-place="${c.id}" ${c.route?'data-route="'+c.route+'"':''} aria-label="${c.label} 장소로 걷기" style="left:${p[0]}px;top:${y}px">${c.label}</button>`);
+    }
+  }
+  document.getElementById('dayMarkers').innerHTML=markers.join('');
+  if(sceneMode==="day")nodesEl.querySelectorAll(".node").forEach(n=>{const id=n.dataset.id;n.style.cssText="";n.classList.remove("up","l","r");n.querySelector(".tag").insertAdjacentHTML("afterbegin","<strong>"+SHORT[id]+"</strong>");});
+  if(sceneMode==='day')stageEl.style.marginBottom=VW.W<900?(nodesEl.offsetHeight+24)+'px':'';
   const s=SIGN, base=project(P3(s[0],s[1],4.8)), e=project(P3(s[0]+1,s[1],4.8));
   const st=document.getElementById("signText"); const k=Math.hypot(e[0]-base[0],e[1]-base[1]);
   st.style.transform="translate("+base[0]+"px,"+base[1]+"px) scale("+(2.6*k/84).toFixed(3)+") translate(-50%,-50%)";
@@ -672,7 +803,12 @@ function decorate(){
    셰이더 안에서 그린다. 풍경은 한 번만 그리므로, 난쟁이가 움직이면
    있던 자리와 갈 자리(그림자 포함)를 감싸는 사각형만 scissor로 다시 그린다.
    픽셀마다 결과가 정해져 있어서 이어 붙인 자리에 이음매가 생기지 않는다. */
-const reduce=matchMedia("(prefers-reduced-motion: reduce)").matches;
+const motionPreference=matchMedia("(prefers-reduced-motion: reduce)");
+let reduce=motionPreference.matches;
+motionPreference.addEventListener("change",e=>{
+  reduce=e.matches;
+  if(reduce&&walking){const target=walking.to;cancelAnimationFrame(walking.raf);walking=null;at=target;placeDwarf(...NXZ[target]);arrived(target);}
+});
 const DW_S=1.25, DW={x:0,y:0,z:0,yaw:0,goal:null,hop:0,sq:0,bounce:0,on:false,dirty:false,drawn:null};
 let maxHop=0;
 window.__dw=Object.freeze({get hat(){return !hatLost()},get tramp(){return trampMode()},get feet(){return feetMode()},get walking(){return !!walking},get hop(){return DW.hop},get maxHop(){return maxHop}});
@@ -699,14 +835,14 @@ const feetMode=()=>trampMode()==="feet";
 const sideOpen=()=>{ const m=byId("morning"); return !!m&&isOff(m); };
 function hatPos(){ const [x,z]=NXZ[hatSpot()], hx=x+1.7, hz=z+1.6; return [hx,groundY(hx,hz)+.48,hz]; }
 function worldUniforms(){if(!gl)return;const h=hatPos();
-  gl.uniform4f(U.uHat,h[0],h[1],h[2],hatLost()?1:0);gl.uniform2f(U.uPathOn,sideOpen()?1:0,state.line===3?1:0);
+  gl.uniform4f(U.uHat,h[0],h[1],h[2],sceneMode==="day"&&hatLost()?1:0);gl.uniform2f(U.uPathOn,sceneMode==="day"&&sideOpen()?1:0,sceneMode==="day"&&state.line===3?1:0);
 }
 /* 노드 원판 위에서는 원판 윗면에, 아니면 땅에 발을 디딘다 */
-function feetY(x,z){ const g=groundY(x,z); let y=g;
+function feetY(x,z){ const g=groundY(x,z); if(sceneMode==="day")return g;let y=g;
   for(const id of NODE_ORDER){ const d=Math.hypot(x-NXZ[id][0],z-NXZ[id][1]); if(d<1.6) y=Math.max(y,g+(nodeY(id)+.26-g)*smooth(1.6,1.15,d)); }
   return y; }
 function dwarfUniforms(){ if(!gl) return;
-  gl.uniform4f(U.uDw,DW.x,DW.y+DW.hop,DW.z,DW.yaw); gl.uniform4f(U.uDw2,DW_S,DW.sq,DW.on?1:0,DW.hop);
+  gl.uniform4f(U.uDw,DW.x,DW.y+DW.hop,DW.z,DW.yaw); gl.uniform4f(U.uDw2,DW_S,DW.sq,DW.on&&sceneMode==="day"?1:0,DW.hop);
   const tm=trampMode(); gl.uniform4f(U.uDw3,hatLost()?0:1,tm==="feet"?1:0,tm==="feet"?DW.bounce:0,tm==="none"?1:0); }
 const DW_L=v3.norm([-.62,.66,.42]);
 function dwarfRect(){
@@ -735,7 +871,7 @@ function drawDwarf(){
 }
 const angTo=(a,b)=>a+Math.atan2(Math.sin(b-a),Math.cos(b-a));
 /* 가만히 있을 땐 카메라 쪽을 보되, 등의 트램펄린이 보이게 비스듬히 선다 */
-const idleYaw=(x,z)=>Math.atan2(-(CAM.ro[0]-x),CAM.ro[2]-z)+.6;
+const idleYaw=(x,z)=>sceneMode==="day"?-1.8:Math.atan2(-(CAM.ro[0]-x),CAM.ro[2]-z)+.6;
 function placeDwarf(x,z,hop,squash,yaw){
   DW.x=x; DW.z=z; DW.y=feetY(x,z); DW.hop=hop||0; DW.sq=squash||0; DW.on=true;
   maxHop=Math.max(maxHop,DW.hop);
@@ -747,6 +883,7 @@ function placeDwarf(x,z,hop,squash,yaw){
 let breathT=0;
 (function breathe(now){
   requestAnimationFrame(breathe);
+  if(sceneMode==="week")return;
   if(!gl||reduce||walking||!DW.on||!ov.hidden||now-breathT<(feetMode()?50:83)) return; breathT=now;  // 두루마리가 덮고 있으면 쉰다
   if(feetMode()){ const ph=(now/760)%1; DW.bounce=.55*Math.sin(ph*Math.PI); DW.sq=ph<.12||ph>.88?.7:0; }  // 3선: 발밑 트램펄린에서 통통 튄다
   else { DW.bounce=0; DW.sq=.16*(.5-.5*Math.cos(now/1800*Math.PI*2)); }
@@ -790,6 +927,7 @@ function walkTo(id){
     const q=pts.find(p=>Math.hypot(p[0]-x,p[1]-z)>.05);
     if(q&&s>0){ const dx=q[0]-x, dz=q[1]-z, c=(vx*dx+vz*dz)/(s*Math.hypot(dx,dz)); if(c>0) v0=s*c; }  // 길 방향 성분만 이어받는다
     walking=null; }
+  else if(pausedDayPosition){pts=routeFrom(DW.x,DW.z,id);pausedDayPosition=false;}
   else pts=route(at,id);
   sel=id; showInfo(); decorate();
   const cum=cumOf(pts), total=cum[cum.length-1];
@@ -834,7 +972,7 @@ function showInfo(){
 /* 일요일(오늘)에 산 정상 칸을 누르면: 정상까지 걸어가서 점프 연출을 본다. 이미 정상에 있으면 바로 */
 let jumpOnArrive=false;
 const sundayToday=()=>isToday()&&dayIdx===0;
-function arrived(id){ if(jumpOnArrive&&id==="sunday"){ jumpOnArrive=false; WEEK.playJump(); } }
+function arrived(id){ if(sceneMode==="day"){setCamera();buildOverlay();decorate();DW.drawn=null;placeDwarf(NXZ[id][0],NXZ[id][1]);render();} if(jumpOnArrive&&id==="sunday"){ jumpOnArrive=false; WEEK.playJump(); } }
 nodesEl.addEventListener("click",e=>{ const n=e.target.closest(".node"); if(!n) return; const id=n.dataset.id;
   if(id==="sunday"&&sundayToday()){ jumpOnArrive=true; if(!walking&&at===id){ sel=id; showInfo(); decorate(); arrived(id); } else walkTo(id); return; }
   jumpOnArrive=false;
@@ -878,15 +1016,16 @@ function layoutAll(){
   const W=stageEl.clientWidth||window.innerWidth, land=W>=900;
   const H=land?Math.round(Math.min(Math.max(window.innerHeight,620),W*.72)):Math.round(Math.min(W*1.75,Math.max(window.innerHeight*.92,620)));
   stageEl.style.height=H+"px"; VW={W,H,land}; setCamera();
-  refresh(true); placeDwarf(NXZ[at][0],NXZ[at][1]);
+  placeDwarf(NXZ[at][0],NXZ[at][1]); refresh(true);
 }
 (function init(){
   setDay(dayIdx);
   restoreTodayWake();
   const W=toMin(wakeEl.value)??450, woke=toMin(wokeEl.value)??W; state={W,line:computeLine(W,woke)};
-  document.getElementById("days").addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b) return; setDay(+b.dataset.d); restoreTodayWake(); if(walking){ cancelAnimationFrame(walking.raf); at=walking.to; walking=null; dw.classList.add("idle"); } refresh(true); placeDwarf(NXZ[at][0],NXZ[at][1]); });
+  document.getElementById("days").addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b) return; setDay(+b.dataset.d); restoreTodayWake(); if(walking){ cancelAnimationFrame(walking.raf); at=walking.to; walking=null; dw.classList.add("idle"); } placeDwarf(NXZ[at][0],NXZ[at][1]); refresh(true); });
   const h=location.hash.slice(1), n=nowId(); at=sel=(h&&NXZ[h])?h:(n||"dawn");
-  initGL(); layoutAll();
+  // Let DB bindings finish before synchronous shader compilation can occupy the main thread.
+  document.body.classList.add("journey-day"); layoutAll();
   let to,lastW=VW.W; window.addEventListener("resize",()=>{ clearTimeout(to); to=setTimeout(()=>{ if(Math.abs(stageEl.clientWidth-lastW)>2){ lastW=stageEl.clientWidth; layoutAll(); } },180); });
   let calendarDate=JOURNEY.todayKey();
   const updateCalendar=()=>{
@@ -895,7 +1034,7 @@ function layoutAll(){
   };
   document.addEventListener("visibilitychange",updateCalendar);
   setInterval(()=>{ updateCalendar(); decorate(); if(!walking) showInfo(); },60000);
-  JOURNEY.ready.then(()=>{ applyJourney(); JOURNEY.onChange(applyJourney);
+  JOURNEY.ready.then(()=>{ applyJourney(); if(state.line===3&&!location.hash)at=sel='minimum'; initGL(); layoutAll(); JOURNEY.onChange(applyJourney);
     const ready=()=>{ if(gl&&!raster.done){ requestAnimationFrame(ready); return; } window.__journeyReady=true; }; ready();
   }).catch(e=>console.error(e));  // db 처리와 첫 렌더가 끝나면 시험용 준비 신호
 })();
@@ -908,3 +1047,17 @@ function layoutAll(){
     h+='<span class="bubble" style="left:'+rnd(2,96).toFixed(1)+'%;width:'+s+'px;height:'+s+'px;--d:'+rnd(28,50).toFixed(1)+'s;--delay:-'+rnd(0,40).toFixed(1)+'s"></span>'; }
   box.innerHTML=h;
 })();
+
+let savedDayPosition=null,pausedDayPosition=false;
+// Landscape signs and the complete itinerary share exactly the same walking/scroll action.
+document.getElementById("dayMarkers").addEventListener("click",e=>{
+  const sign=e.target.closest("[data-place]");
+  if(sign)nodesEl.querySelector(`[data-id="${sign.dataset.place}"]`)?.click();
+});
+const MAP_VIEW={
+  showWeek(){if(sceneMode==="week")return;savedDayPosition={x:DW.x,z:DW.z,yaw:DW.yaw}; if(walking){cancelAnimationFrame(walking.raf);walking=null;pausedDayPosition=true;}jumpOnArrive=false;closeScroll();sceneMode="week";document.body.classList.remove("journey-day");uploadSceneTerrain();setCamera();buildOverlay();render();},
+  showDay(){if(sceneMode==="day")return;sceneMode="day";document.body.classList.add("journey-day");uploadSceneTerrain();setCamera();buildOverlay();decorate();const p=savedDayPosition;placeDwarf(p?p.x:NXZ[at][0],p?p.z:NXZ[at][1],0,0,p?.yaw);render();},
+  get is3D(){return !!gl;},
+  sections(){return MAP_SCENES.sections(ROAD).map(s=>({...s,screen:project(P3(...s.center,1)),points:s.points.map(p=>project(P3(...p,.15)))}));},
+  summit(){return project(P3(...NXZ.sunday,1));}
+};

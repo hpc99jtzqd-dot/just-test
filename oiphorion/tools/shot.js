@@ -21,7 +21,7 @@ if (options.view && options.view !== 'week') throw new Error('--view must be wee
   const fake = createFakeClaude({ fixture: options.fixture });
   const b = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
   try {
-    const p = await b.newPage({ viewport: { width: +w, height: +h }, timezoneId: 'Asia/Seoul' });
+    const p = await b.newPage({ viewport: { width: +w, height: +h }, timezoneId: 'Asia/Seoul', deviceScaleFactor: 1, reducedMotion: 'reduce' });
     const errs = []; p.on('pageerror', e => errs.push(e.message));
     p.on('console', msg => { if (msg.type() === 'error') errs.push(msg.text()); });
     await p.route('https://fonts.googleapis.com/**', route => route.fulfill({ contentType: 'text/css', body: '' }));
@@ -29,12 +29,13 @@ if (options.view && options.view !== 'week') throw new Error('--view must be wee
     await p.clock.setFixedTime(options.at ? fixedTime(options.at) : new Date());
     await p.goto(pathToFileURL(path.resolve(__dirname, '../dist/index.html')).href, { waitUntil: 'commit', timeout: 240000 });
     await p.waitForFunction(() => window.__journeyReady === true && (window.__rendered >= 1 || document.querySelector('.stage.nogl')), null, { timeout: 240000 });
+    if(options.fixture && !await p.evaluate(()=>JOURNEY.online))throw new Error('Fixture DB timed out; refusing an inaccurate screenshot');
     if (woke) { await p.fill('#woke', woke); await p.locator('#woke').blur(); }
     if (options.view === 'week') await p.click('#wkWeek');
     await p.waitForTimeout(woke ? 1200 : 300);
     await p.waitForFunction(() => !document.querySelector('#stage.painting'), null, { timeout: 240000 });
     await p.screenshot({ path: out, fullPage: +w < 900, timeout: 240000 });
     if (errs.length) throw new Error(errs.join('\n'));
-    console.log('Saved ' + out);
+    console.log('Saved ' + out + ' ' + JSON.stringify(await p.evaluate(()=>({scene:window.__renderScene,firstRenderMs:Math.round(window.__firstRenderMs||0),gpuCompleteMs:Math.round(window.__renderMs||0),canvas:[document.getElementById('gl').width,document.getElementById('gl').height]}))));
   } finally { await b.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

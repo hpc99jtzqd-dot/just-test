@@ -41,7 +41,7 @@ head = (read("head.html")
         .replace("/*@NODES_CSS@*/", read("nodes.css") + "\n" + read("week.css"))
         .replace("/*@SCROLL_CSS@*/", read("scroll.css"))
         .replace("/*@MOTION_CSS@*/", read("motion.css")))
-js = "\n".join(read(f) for f in ["data.js", "school.js", "journey.js", "scroll.js", "map.js", "week.js"])
+js = "\n".join(read(f) for f in ["data.js", "school.js", "journey.js", "scroll.js", "map-scenes.js", "map.js", "week.js"])
 js = js.replace("__CPP__", json.dumps(cpp, ensure_ascii=False).replace("</", "<\\/"))
 js = js.replace("__ANCHORS__", json.dumps(anchors)).replace("__LEAVE__", json.dumps(leave))
 

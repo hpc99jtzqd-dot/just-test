@@ -4,7 +4,7 @@
   <header class="head">
     <span class="eyebrow">공부 운영체제 v0.5 · 하루의 길</span>
     <h1>오이포리온</h1>
-    <p class="lead">밝은 초원에서 회색 암릉 너머 눈 덮인 정상까지, 가는 흰 자갈길을 오른다. 칸을 누르면 난쟁이가 걸어가고, 한 번 더 누르면 두루마리가 펼쳐진다.</p>
+    <p class="lead">하루는 햇살과 들꽃 사이의 산책, 한 주는 정상으로 이어지는 등정. 장소를 눌러 걸어가고, 한 번 더 누르면 두루마리가 펼쳐진다.</p>
     <section class="signpost glass" aria-label="오늘의 갈림길">
       <label class="field" for="wake">고정 기상 <input id="wake" type="time" value="07:30"> <small>예시</small></label>
       <label class="field" for="woke">오늘 일어난 시각 <input id="woke" type="time"></label>
@@ -24,13 +24,16 @@
     <svg id="trail" aria-hidden="true"><path class="spur" id="spur" d=""/></svg>
     <div id="signText" aria-hidden="true"><b>낙하 한도</b><span>?????</span></div>
     <nav id="nodes" aria-label="하루의 지도"></nav>
+    <nav id="dayMarkers" aria-label="길 위의 장소"></nav>
     <section class="wk" id="wkPanel" aria-label="한 주 보기" hidden>
       <div class="wk-in">
         <h2 class="wk-title" id="wkTitle"></h2>
-        <p class="wk-offline" id="wkOffline" hidden>기록이 저장되지 않아요 (claude.ai에서 로그인 상태로 열어야 기기 간에 이어져요)</p>
         <svg class="wk-svg" id="wkSvg" viewBox="0 0 360 300" role="img" aria-label="월요일부터 토요일까지 이어지는 길과 일요일 산꼭대기"></svg>
+        <div class="wk-records" id="wkRecords">
+        <p class="wk-offline" id="wkOffline" hidden>기록이 저장되지 않아요 (claude.ai에서 로그인 상태로 열어야 기기 간에 이어져요)</p>
         <ol class="wk-days" id="wkDays"></ol>
         <p class="wk-status" id="wkStatus" aria-live="polite"></p>
+        </div>
       </div>
       <div class="wk-jump" id="wkJump" hidden role="dialog" aria-label="일요일 점프" aria-live="polite">
         <svg class="wk-scene" viewBox="0 0 300 300" aria-hidden="true">
