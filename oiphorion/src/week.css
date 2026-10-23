@@ -126,7 +126,13 @@ body.wk-on #nodes,body.wk-on #trail,body.wk-on #signText{display:none}
 .wk-3d .wk-d.wk-future,.wk-3d .wk-d.wk-future i{color:#4b6250}
 .wk-3d .wk-status{background:rgba(255,252,232,.94)}
 .wk-records{display:flex;flex-direction:column;gap:8px}
-@media(min-width:900px){.wk-3d .wk-days{width:100%;gap:8px}.wk-3d .wk-d{min-height:72px;font-size:12px}.wk-3d .wk-status{width:100%}}
+@media(min-width:900px){
+ /* 기록은 오른쪽 세로 칸. 아래에 깔면 월·화 구간과 산 아랫길을 덮는다 */
+ .wk-3d .wk-records{position:absolute;right:20px;top:74px;width:290px}
+ .wk-3d .wk-days{width:100%;gap:6px;grid-template-columns:1fr}
+ .wk-3d .wk-d{min-height:0;font-size:12px;padding:6px 10px;flex-direction:row;flex-wrap:wrap;align-items:baseline;gap:2px 8px}
+ .wk-3d .wk-status{width:100%}
+}
 @media(max-width:899px){
  .head .lead{font-size:12px;line-height:1.5;margin-block:6px 10px}
  .head h1{font-size:32px;margin-block:6px}

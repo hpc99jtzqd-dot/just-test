@@ -3,6 +3,32 @@
 민(김민성, 동국대 컴퓨터공학과)의 공부 운영체제를 **3D 모험 지도**로 보여 주는 한 장짜리 웹페이지와, 같은 규칙을 구현한 C++ 콘솔 프로그램이다.
 claude.ai 대화(2026-10-22)에서 만들었고, 이 파일은 그 대화를 압축한 인계 문서다.
 같은 날 클라우드 세션에서 v0.4로 올렸다(@anchor 리팩터, 셰이더 난쟁이). 저장소는 `hpc99jtzqd-dot/just-test`의 `oiphorion/` 폴더, 브랜치 `oiphorion`.
+**v2(한 주 여정)는 브랜치 `oiphorion-team`에 있다.** 아래 「v2: 하루의 산책, 한 주의 등정」이 먼저고, 그 밑의 v0.4/v0.5 설명 가운데 난쟁이(원뿔 모자) 이야기는 지금 코드와 다르다. 지금 주인공은 뉴스보이 캡을 쓴 소년이다.
+
+## v2: 하루의 산책, 한 주의 등정 (oiphorion-team)
+
+- 명세: `.omc/specs/deep-interview-oiphorion-weekly-journey.md`(민과 18라운드 선문답).
+- 인계 기록: `.omc/handoffs/v2/`(설계 `design.md`, 비평 `critic1·2.md`, 답 `answers2·3.md`, `README.md`의 남은 일).
+- **규칙(`src/journey.js` 머리 주석이 계약):**
+  - 1주차는 2026-11-02(월)이다. 월~토는 길 구간, 일요일은 정상이다.
+  - 2선이면 그날 모자를 잃는다. 3선인 첫날에는 트램펄린이 부서지고, 그 주에는 다시 없다.
+  - 6일 동안 트램펄린을 지키면 다음 맵(5개)으로 간다. 하나라도 잃으면 같은 맵에 머문다. 5맵을 끝내면 하얀 문 엔딩, 그다음 2회차다.
+  - 기록이 없는 과거 날은 3선으로 계산만 하고 쓰지 않는다.
+  - db 경로는 `data/users/<id>/journey/days/<YYYY-MM-DD>`, 날짜는 한국 시간이다.
+- **하루 보기(`sceneMode='day'`)** 는 소년 뒤 낮은 시점의 숲길 "여정"이다.
+  - 장소(`NXZ`)마다 카메라가 바뀐다(`MAP_SCENES.camera`). 도착할 때만 전체 렌더하고, 걷는 동안은 부분 다시 그리기를 쓴다.
+  - 나무 16그루(`MAP_SCENES.dayTrees`): 앞 `dayConifers`그루는 층층 침엽수, 나머지는 줄기가 보이는 활엽수다. 소년을 가리는 나무는 `treeClear`가 뺀다.
+  - 큰길 둘레에는 키 큰 풀·들꽃 띠가 있다. 하늘은 파스텔이고, 한낮의 달과 하얀 문이 있다.
+  - 하얀 문 자리는 `doorSpot()`이 그릴 때마다 고른다. 패널·나무에 안 가리는 하늘을 찾고, 먼 나무는 두 그루까지 비켜 준다.
+- **주간 보기(`sceneMode='week'`)** 는 예전 3D 지도를 등정 맵으로 쓴다.
+  - 큰길을 같은 길이 6구간으로 나눈다(`MAP_SCENES.sections`). 표지는 `MAP_SCENES.labels`가 놓는다. 넓은 화면은 한 줄 알약, 폰은 두 줄 카드이고, 기준점(소년·깃발)을 덮지 않는다.
+  - 기록 목록 `#wkDays`: 데스크톱은 오른쪽 290px 칸, 폰은 지도 아래.
+  - 지켜야 할 DOM 계약: `.wk-hat .wk-broken .wk-empty .wk-pending .wk-summit`, `data-line`, `data-state`. 시험 E8·E9·E20이 본다.
+- 셰이더는 `uDay` 상수로 하루·주간 프로그램을 따로 컴파일한다. 하루 지면은 해석식 교차, 주간 지형은 230회 march다. 첫 렌더 목표는 민의 PC(SwiftShader)에서 6초 이하다.
+- **나중에 할 것: 레트로(도트) 모드.**
+  - 방법: 저해상도 렌더 + `image-rendering: pixelated` + 팔레트 양자화·베이어 디더.
+  - 측정해 보니 주간 렌더는 3배 빨라지지만, 첫 진입은 고정비(지형·컴파일) 때문에 그대로다.
+  - 그래서 전면 재작성 대신 선택 보기 모드로 넣기로 했다(민 결정, 2026-10-23).
 
 ## 작업할 때 지킬 것
 
@@ -30,9 +56,14 @@ src/school.js     LEAVE_AT(빌드 주입), 수업 날(월~목) 수도코드 SCHO
 src/scroll.js     하이라이터(hlPseudo, hlCpp), 두루마리 열기/닫기/깊이 전환
 src/map.js        시각 도우미, 갈림길 판정, 높이 지도·길(큰길·샛길·오솔길) 생성, 길 그래프, 레이마칭 셰이더
                   (난쟁이·떨어진 모자 SDF 포함), 카메라·투영, 노드 겹, 난쟁이 부분 다시 그리기, 초기화
+src/journey.js    (v2) 한 주 여정 규칙·db 저장. 머리 주석이 계약
+src/map-scenes.js (v2) 하루 카메라·나무·표지 배치·주간 구간 나누기(순수 함수, 단위 시험 대상)
+src/week.js/.css  (v2) 주간 등정 맵 표지·기록 목록·일요일 점프
 cpp/study_os.cpp  공부 운영체제 C++17 (앵커 주석 29쌍 포함 430줄, 페이지에는 앵커를 지운 372줄이 들어간다)
-tools/shot.js     Playwright + SwiftShader 렌더 스크린샷
-refs/             민이 준 레퍼런스 사진 2장, 현재 화면 캡처 2장
+tools/shot.js     Playwright + SwiftShader 렌더 스크린샷 (--at=, --fixture=lose2|lose3|keep, --view=week)
+tools/fake-claude.js, journey-e2e.cjs, journey.test.cjs, map-terrain.test.cjs   (v2) 가짜 db와 시험
+shots/            v2-*.png 최종 캡처 5장과 v2-validation.md
+refs/             민이 준 레퍼런스 사진(ref5~7: 들꽃 풀길, 침엽수 흙길, 햇살 숲길), 화면 캡처
 ```
 
 ## 외부 스킬
@@ -47,7 +78,12 @@ node tools/shot.js 1280 800 out.png             # 데스크톱 렌더 확인 (pl
 node tools/shot.js 400 820 phone.png 11:00      # 휴대폰 + '일어난 시각' 넣기
 g++ -std=c++17 -O2 -Wall -Wextra -o study_os cpp/study_os.cpp
 printf '7\n07:30\n화\n08:40\n0\n' | ./study_os  # 수업 날 계획 시험
+node tools/shot.js 1280 800 out.png --at=2026-11-05T10:00 --fixture=lose2 [--view=week]   # v2 장면
+node --test tools/journey.test.cjs tools/map-terrain.test.cjs                             # 단위 시험
+node tools/journey-e2e.cjs                       # 전체 e2e (약 10분). E2E_ONLY=이름일부 로 하나만
 ```
+
+수정하는 동안에는 관련 시험 하나와 캡처 한 장만 본다. 라운드가 끝날 때 전체 e2e와 `shots/v2-*.png` 5장을 만든다. 브라우저 시험을 동시에 두 개 돌리면 시간 초과가 나니 하나씩 돌린다.
 
 `dist/index.html`은 브라우저로 바로 열린다. `dist/artifact.html`은 claude.ai 아티팩트용 본문이다. 아티팩트 게시본은 head/body 태그 없이 래핑된다.
 

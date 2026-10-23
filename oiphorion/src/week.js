@@ -68,6 +68,10 @@ const WEEK = (() => {
          `<line x1="${sx}" y1="${sy}" x2="${sx}" y2="${sy-34}" stroke="#10243f" stroke-width="2.5"/>` +
          `<path class="wk-flag" d="M${sx} ${sy-34} L${sx+22} ${sy-27} L${sx} ${sy-19} Z" fill="#ff5a4a" stroke="#a8231a" stroke-width="1.2"/>` +
          `<text x="${sx}" y="${sy+24}" text-anchor="middle" font-size="13" fill="#10243f" stroke="#fff" stroke-width="3" paint-order="stroke">${sun ? "일요일 · 눌러서 점프" : "일요일"}</text></g>`;
+    // 표지 내용: 두 줄 카드(폰) 또는 한 줄 알약(넓은 화면). 모자·트램펄린 그림은 오른쪽 끝.
+    const mapLabel=(b,title,word,d)=>`<rect width="${b.w}" height="${b.h}" rx="9" fill="#fffbee" fill-opacity=".96" stroke="#6c8064"/>`+
+      (b.h<40?`<text x="10" y="21" font-size="13" fill="#243e33">${title} <tspan fill="#41523a" font-size="11">${word}</tspan></text>`+(d.hatLost?hatSvg(b.w-14,b.h/2+4,20):'')+(d.trampolineBreaks?trampBroken(b.w-38,b.h/2+5):'')
+      :`<text x="10" y="20" fill="#243e33" font-size="14">${title}</text><text x="10" y="42" fill="#41523a" font-size="11">${word}</text>`+(d.hatLost?hatSvg(b.w-16,43,25):'')+(d.trampolineBreaks?trampBroken(b.w-43,43):''));
     panel.classList.toggle("wk-3d",MAP_VIEW.is3D);
     if(MAP_VIEW.is3D){
       svg.setAttribute("viewBox",`0 0 ${VW.W} ${VW.H}`);svg.style.background="none";
@@ -78,9 +82,9 @@ const WEEK = (() => {
         const b=boxes[i+1],cx=b.x+b.w/2,cy=b.y+b.h/2;
         g+=`<path data-week-section="${d.key}" d="${path}" fill="none" stroke="${LINE_COLOR[line]||'#e5e7e4'}" stroke-width="${line===1?6:line===2?4:2.5}" ${d.future||!line||line===3?'stroke-dasharray="4 7"':''} opacity=".9"/>
           <path d="M${x} ${y} L${cx} ${cy}" stroke="#53674e" stroke-width="1" fill="none"/><circle cx="${x}" cy="${y}" r="3" fill="#fff9db"/>
-          <g class="wk-map-label" data-state="${displayState(d)}" data-key="${d.key}" ${line?'data-line="'+line+'"':''} transform="translate(${b.x} ${b.y})"><rect width="${b.w}" height="${b.h}" rx="9" fill="#fffbee" fill-opacity=".96" stroke="#6c8064"/><text x="10" y="20" fill="#243e33" font-size="14">${NAMES[i+1]}${line?' · '+line+'선':''}</text><text x="10" y="42" fill="#41523a" font-size="11">${EMPTY_LABEL[displayState(d)]||({1:'큰길',2:'들꽃',3:'오솔길'})[line]||'—'}</text>${d.hatLost?hatSvg(b.w-16,43,25):''}${d.trampolineBreaks?trampBroken(b.w-43,43):''}</g>`;
+          <g class="wk-map-label" data-state="${displayState(d)}" data-key="${d.key}" ${line?'data-line="'+line+'"':''} transform="translate(${b.x} ${b.y})">${mapLabel(b,NAMES[i+1]+(line?' · '+line+'선':''),EMPTY_LABEL[displayState(d)]||({1:'큰길',2:'들꽃',3:'오솔길'})[line]||'—',d)}</g>`;
       });
-      const [x,y]=MAP_VIEW.summit(),b=boxes[0];g+=`<path d="M${x} ${y} L${b.x+b.w/2} ${b.y+b.h}" stroke="#977846" fill="none"/><g id="wkSummit" class="wk-summit wk-map-label${sun?' on':''}" role="${sun?'button':'img'}" ${sun?'tabindex="0"':''} aria-label="${label}" transform="translate(${b.x} ${b.y})"><rect width="${b.w}" height="${b.h}" rx="12" fill="#fff8d9" stroke="#977846"/><text x="10" y="23" fill="#3c4935" font-size="14">⚑ 일요일 · 정상</text><text x="10" y="43" fill="#3c4935" font-size="11">${sun?'눌러서 점프':'한 주의 도착점'}</text></g>`;
+      const [x,y]=MAP_VIEW.summit(),b=boxes[0];g+=`<path d="M${x} ${y} L${b.x+b.w/2} ${b.y+b.h}" stroke="#977846" fill="none"/><g id="wkSummit" class="wk-summit wk-map-label${sun?' on':''}" role="${sun?'button':'img'}" ${sun?'tabindex="0"':''} aria-label="${label}" transform="translate(${b.x} ${b.y})"><rect width="${b.w}" height="${b.h}" rx="12" fill="#fff8d9" stroke="#977846"/>${b.h<40?`<text x="10" y="21" fill="#3c4935" font-size="13">⚑ 일요일 · ${sun?'눌러서 점프':'정상'}</text>`:`<text x="10" y="23" fill="#3c4935" font-size="14">⚑ 일요일 · 정상</text><text x="10" y="43" fill="#3c4935" font-size="11">${sun?'눌러서 점프':'한 주의 도착점'}</text>`}</g>`;
       const current=Math.max(0,Math.min(5,(dowOf(JOURNEY.todayKey())+6)%7)), pos=sun?MAP_VIEW.summit():sections[current].screen;
       let today=days[current];if(sun){let record=null;try{record=JSON.parse(store.get("oi.journey.days")||"{}")[JOURNEY.todayKey()];}catch(e){}today={line:record?.line,hatLost:record?.line===2};}
       const mode=JOURNEY.trampolineFor(JOURNEY.todayKey()), tramp=mode==='gone'?'none':today?.line===3?'feet':'back';

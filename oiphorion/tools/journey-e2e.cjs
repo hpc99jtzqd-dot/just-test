@@ -8,7 +8,8 @@ const url = pathToFileURL(path.resolve(__dirname, '../dist/index.html')).href;
 const args = ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'];
 const cases = [];
 let browser, fallback;
-function test(name, fn) { cases.push({ name, fn }); }
+// E2E_ONLY=부분문자열 이면 이름에 그 글자가 든 시험만 돈다(수정 중 한 개만 확인할 때).
+function test(name, fn) { if (!process.env.E2E_ONLY || name.includes(process.env.E2E_ONLY)) cases.push({ name, fn }); }
 
 async function session(at, options, fn) {
   const context = await (options.noGL ? fallback : browser).newContext({ timezoneId: 'Asia/Seoul', viewport: options.viewport || { width: 960, height: 720 }, deviceScaleFactor: 0.5, reducedMotion:options.reduced?'reduce':'no-preference' });

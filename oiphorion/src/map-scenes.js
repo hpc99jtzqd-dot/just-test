@@ -1,7 +1,11 @@
 /* Rendering-only scene descriptors. No dates, records or progression rules. */
 const MAP_SCENES = {
   dayHeight(x,z){return .8*Math.sin(x*.045)+.55*Math.cos(z*.06);},
-  dayTrees:[[-38,31,3.8],[-19,48,3.2],[-18,23,3.6],[4,49,3.7],[14,21,3.3],[43,30,3.9],[-9,1,3.5],[29,-18,3.8],[-8,29,2.6],[23,43,3.0],[36,9,3.1],[7,-16,3.3]],
+  // 앞의 dayConifers 그루는 층층 침엽수(사진 6), 나머지는 줄기가 보이는 활엽수(사진 7).
+  // 침엽수는 큰길 가장자리 4~6 거리에 붙여 시점에서 길 양옆이 닫히게 한다. 셰이더 배열 한도 16그루.
+  dayConifers:7,
+  dayTrees:[[-16,43,3.7],[4,44.5,3.9],[30,29.5,3.6],[46,22,3.8],[12,12.5,3.3],[29,-14,3.5],[-4,-13,3.6],
+            [-38,31,3.8],[-18,23,3.6],[14,21,3.3],[43,31,3.9],[-9,1,3.5],[23,43,3.0],[36,9,3.1],[7,-17,3.3],[-8,29,2.6]],
   treeClear(tree,ro,hero,ground){
     const [x,z,s]=tree,g=ground(x,z),v=hero.map((h,i)=>h-ro[i]),len=v.reduce((sum,c)=>sum+c*c,0)||1;
     // Conservative crown/bush bounds protect the complete cap-to-feet silhouette.
@@ -22,16 +26,19 @@ const MAP_SCENES = {
     return {ro,ta,fl:aspect<.85?1.2:1.65,zone};
   },
   labels(points,width,height){
-    const placed=[],w=width<600?112:124,h=58;
+    // 폰은 두 줄 카드, 넓은 화면은 한 줄 알약(길·정상을 덜 덮는다).
+    const phone=width<600,placed=[],w=phone?112:160,h=phone?58:32;
     return points.map(p=>{
       let best=null;
-      for(let y=82;y<height-105;y+=64)for(let x=8;x<=width-w-8;x+=width<600?120:132){
+      for(let y=82;y<height-105;y+=h+6)for(let x=8;x<=width-w-8;x+=phone?120:w+8){
         if(width>=900&&x<550&&y<355)continue;
+        if(width>=900&&x+w>width-330)continue;  // 데스크톱 오른쪽 기록 칸
         if(placed.some(b=>x<b.x+w+6&&x+w+6>b.x&&y<b.y+h+6&&y+h+6>b.y))continue;
+        if(points.some(q=>q[0]>x-20&&q[0]<x+w+20&&q[1]>y-38&&q[1]<y+h+10))continue;  // 기준점(소년·정상 깃발)은 덮지 않는다
         const cost=(x+w/2-p[0])**2+(y+h/2-p[1])**2;
         if(!best||cost<best.cost)best={x,y,w,h,cost};
       }
-      best=best||{x:8,y:82+placed.length*64,w,h};placed.push(best);return best;
+      best=best||{x:8,y:82+placed.length*(h+6),w,h};placed.push(best);return best;
     });
   },
   // Equal arc-length sections; terrain construction anchors remain untouched.
