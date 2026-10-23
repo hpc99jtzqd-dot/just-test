@@ -19,7 +19,9 @@ const NODE_ORDER = ["dawn","morning","lunch","afternoon","evening","hobby","clos
 const byId = id=>ALL.find(b=>b.id===id);
 let state={W:450,line:1};
 let dayIdx=todayDow(), PLAN=BLOCKS;
-const planOf=d=>PLANS[d]||PLANS.free;
+/* 이번 주에서 요일 d의 날짜. 그 날짜에 시험 계획(EXAM_DAYS)이 있으면 그것을 쓴다 */
+const dateOfDow=d=>{ const t=JOURNEY.todayKey(), date=new Date(t+"T00:00:00Z"); date.setUTCDate(date.getUTCDate()+(d+6)%7-(date.getUTCDay()+6)%7); return date.toISOString().slice(0,10); };
+const planOf=d=>EXAM_DAYS[dateOfDow(d)]||PLANS[d]||PLANS.free;
 function setDay(d){ dayIdx=d; PLAN=planOf(d); ALL=[...PLAN,...WEEKLY]; document.querySelectorAll('#days button').forEach(b=>b.setAttribute('aria-pressed',String(+b.dataset.d===d))); }
 function blockTime(b){ if(!b.when) return b.whenLabel; const [s,e]=b.when(state.W); if(b.id==="morning"&&s>=e) return "오전 없음"; return hhmm(s)+" – "+hhmm(e); }
 function isOff(b){ if(b.id==="morning"&&!b.fixed){ const [s,e]=b.when(state.W); if(s>=e) return true; } return !!(b.lines&&!b.lines.includes(state.line)); }
