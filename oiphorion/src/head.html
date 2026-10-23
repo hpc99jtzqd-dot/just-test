@@ -13,7 +13,7 @@
   /* 흰 글자를 얹는 버튼·칩: 글자가 놓이는 가운데 띠가 4.5:1 이상 되게 깊게 깐다 */
   --aqua-btn:linear-gradient(180deg,#1a8bbd 0%,#0a6a98 38%,#07567d 100%);
   --leaf-btn:linear-gradient(180deg,#34901c 0%,#23700f 42%,#1c5c0c 100%);
-  --glass-hi:rgba(255,255,255,.80); --glass-lo:rgba(225,242,255,.58); --glass-edge:rgba(255,255,255,.95);
+  --glass-hi:rgba(255,255,255,.90); --glass-lo:rgba(228,243,255,.76); --glass-edge:rgba(255,255,255,.95);
   --glass-shine:rgba(255,255,255,.95); --shadow:rgba(10,40,110,.28);
   --aqua:#12a6d6; --aqua-deep:#0b6d9c; --leaf:#4fb22c; --leaf-hi:#a6ee6e;
   --node:#ffd23a; --node-deep:#c98a06; --node-rim:#5a3b06; --secret:#ff5a4a; --secret-deep:#a8231a;
@@ -51,7 +51,6 @@ h1{font-family:var(--f-game);font-weight:400;font-size:clamp(30px,3.7vw,54px);li
   filter:drop-shadow(0 2px 0 rgba(8,30,110,.55)) drop-shadow(0 0 18px rgba(170,215,255,.6))}
 .lead{margin:0;font-size:14.5px;color:var(--on-sky-soft);max-width:30em}
 .glass{position:relative;background:linear-gradient(180deg,var(--glass-hi),var(--glass-lo));border:1px solid var(--glass-edge);
-  -webkit-backdrop-filter:blur(14px) saturate(160%);backdrop-filter:blur(14px) saturate(160%);
   box-shadow:inset 0 1px 0 var(--glass-shine),0 12px 30px var(--shadow)}
 .signpost{border-radius:22px;padding:10px 12px 10px 16px;display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;align-self:flex-start;max-width:100%;margin-top:4px;color:var(--ink)}
 .field{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-soft)}

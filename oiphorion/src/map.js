@@ -957,17 +957,22 @@ function placeDwarf(x,z,hop,squash,yaw){
   DW.x=x; DW.z=z; DW.y=feetY(x,z); DW.hop=hop||0; DW.sq=squash||0; DW.on=true;
   maxHop=Math.max(maxHop,DW.hop);
   if(!gl){ placeDwarfSVG(x,z,hop,squash); return; }
-  if(yaw===undefined){ DW.goal=angTo(DW.yaw,idleYaw(x,z)); if(reduce||!DW.drawn) DW.yaw=DW.goal; } else { DW.goal=null; DW.yaw=yaw; }
+  if(yaw===undefined){ DW.goal=angTo(DW.yaw,idleYaw(x,z)); if(reduce||!DW.drawn) DW.yaw=DW.goal; DW.idleAt=performance.now(); DW.settled=false; } else { DW.goal=null; DW.yaw=yaw; }
   drawDwarf();
 }
-/* 숨쉬기: 가만히 서 있을 때 살짝 눌렸다 펴진다. 1초에 열두 번쯤만 다시 그린다 */
+/* 숨쉬기: 도착한 뒤 잠깐만 살짝 눌렸다 펴진다(3선은 통통 튄다). 1초에 열두 번쯤 다시 그린다.
+   소년 둘레도 풍경과 같은 무거운 셰이더로 그리므로, 계속 숨쉬면 노트북 GPU가 쉬지 못한다.
+   그래서 숨 두 번(튀기 네 번) 뒤에는 쉬는 자세로 한 번 그리고 멈춘다. 다시 걷거나 도착하면 또 숨쉰다. */
+const BREATHE_MS=3600, BOUNCE_MS=3040;
 let breathT=0;
 (function breathe(now){
   requestAnimationFrame(breathe);
   if(sceneMode==="week")return;
-  if(!gl||reduce||walking||!DW.on||!ov.hidden||now-breathT<(feetMode()?50:83)) return; breathT=now;  // 두루마리가 덮고 있으면 쉰다
-  if(feetMode()){ const ph=(now/760)%1; DW.bounce=.55*Math.sin(ph*Math.PI); DW.sq=ph<.12||ph>.88?.7:0; }  // 3선: 발밑 트램펄린에서 통통 튄다
-  else { DW.bounce=0; DW.sq=.16*(.5-.5*Math.cos(now/1800*Math.PI*2)); }
+  if(!gl||reduce||walking||!DW.on||!ov.hidden||DW.settled||now-breathT<(feetMode()?50:83)) return; breathT=now;  // 두루마리가 덮고 있으면 쉰다
+  const age=performance.now()-(DW.idleAt||0);
+  if(age>(feetMode()?BOUNCE_MS:BREATHE_MS)){ DW.bounce=0; DW.sq=0; if(DW.goal!==null) DW.yaw=DW.goal; DW.settled=true; drawDwarf(); return; }
+  if(feetMode()){ const ph=(age/760)%1; DW.bounce=.55*Math.sin(ph*Math.PI); DW.sq=ph<.12||ph>.88?.7:0; }  // 3선: 발밑 트램펄린에서 통통 튄다
+  else { DW.bounce=0; DW.sq=.16*(.5-.5*Math.cos(age/1800*Math.PI*2)); }
   if(DW.goal!==null) DW.yaw+=(DW.goal-DW.yaw)*.3;  // 걷기를 마치면 천천히 돌아선다
   drawDwarf();
 })(0);
