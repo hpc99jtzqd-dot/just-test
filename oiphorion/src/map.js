@@ -534,6 +534,8 @@ vec3 shadeGround(vec3 p,vec3 rd,float t){
   if(uDay>.5){
     // 큰길 바로 옆은 키 큰 풀과 들꽃 띠: 풀 깎은 길과 대비된다(사진 5). 지오메트리 없이 재질만.
     float verge=smoothstep(.95,1.2,q)*(1.-smoothstep(1.9,2.9,q))*(1.-side)*(1.-spur);
+    // 2선인 날은 들꽃 샛길 양옆에도 같은 들꽃 띠가 핀다(이름처럼 '들꽃' 샛길)
+    verge=max(verge,uPathOn.x*smoothstep(.95,1.2,pq.x)*(1.-smoothstep(1.8,2.6,pq.x))*(1.-road)*(1.-spur));
     alb=mix(alb,vec3(.05,.15,.022),verge*.5);
     vec2 vc=floor(p.xz*4.3),vo=fract(p.xz*4.3)-.5-(vec2(h12(vc+2.1),h12(vc+5.3))-.5)*.5;
     float hue=h12(vc+.7),vf=step(.5,h12(vc+8.7))*(1.-smoothstep(.09,.19,length(vo)))*verge*(1.-smoothstep(55.,105.,t));
