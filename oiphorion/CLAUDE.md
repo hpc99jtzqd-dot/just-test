@@ -56,6 +56,8 @@ src/motion.css    prefers-reduced-motion
 src/body.html     머리말, 갈림길 패널(기상 시각·요일), 무대(#gl 캔버스 + 겹), 안내판, 두루마리 마크업, 난쟁이 SVG
 src/data.js       CPP·ANCHORS 자리표시자, DAY/MATH 수도코드, SRC, 수업 없는 날 BLOCKS, WEEKLY(일요일), ALL
 src/school.js     LEAVE_AT(빌드 주입), 수업 날(월~목) 수도코드 SCHOOL, 요일별 계획 PLANS, DAY_NAMES
+                  (v2) 시험 주말 EXAM_DAYS: 날짜를 콕 집어 그날만 계획을 바꾼다
+src/routines.js   (v2) 블록마다 '실제로 하는 순서' steps/stepsBy[선]. 안내판 '자세한 순서', 두루마리 '이렇게 한다'
 src/scroll.js     하이라이터(hlPseudo, hlCpp), 두루마리 열기/닫기/깊이 전환
 src/map.js        시각 도우미, 갈림길 판정, 높이 지도·길(큰길·샛길·오솔길) 생성, 길 그래프, 레이마칭 셰이더
                   (난쟁이·떨어진 모자 SDF 포함), 카메라·투영, 노드 겹, 난쟁이 부분 다시 그리기, 초기화
@@ -204,6 +206,7 @@ node tools/journey-e2e.cjs                       # 전체 e2e (약 10분). E2E_O
   - `pseudo`: `[{src, from, to, hl}]`.
   - `cpp`: `[["앵커 이름", "설명"]]`. 범위는 `ANCHORS[이름]`에서 온다.
   - `fixed`: 수업 날 블록이라는 표시.
+  - `steps` / `stepsBy[line]`: 할 일(`todo`, 무엇을)을 실제로 하는 순서(어떻게). 내용은 `src/routines.js`에서 붙인다. 규칙이 아니라서 C++·수도코드에는 없다.
 - 수업 날 계획에는 `PLAN.leave`(분)가 있다. 있으면 길을 출발까지 남은 시간으로 판정한다.
 - 두루마리 깊이: 할 일(지도) → 수도코드(계획표 + 해당 줄 ▸ 하이라이트) → C++(발췌 + 전체 소스).
 

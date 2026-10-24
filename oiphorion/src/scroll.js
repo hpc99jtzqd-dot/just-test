@@ -45,6 +45,8 @@ function view(){
   if(level===1){
     h+='<section class="plan"><h4>계획표</h4><ol>'+((b.todoBy&&b.todoBy[state.line])||b.todo).map(t=>'<li>'+esc(t)+'</li>').join("")+
        (b.extra2&&state.line===2?'<li>'+esc(b.extra2)+'</li>':"")+'</ol></section>';
+    const steps=stepsOf(b,state.line);
+    if(steps.length) h+='<section class="plan steps"><h4>이렇게 한다</h4><ol>'+steps.map(t=>'<li>'+esc(t)+'</li>').join("")+'</ol></section>';
     h+='<div class="p-view enter">';
     b.pseudo.forEach(p=>{
       const s=SRC[p.src];

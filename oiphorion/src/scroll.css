@@ -44,6 +44,8 @@ body:has(.overlay:not([hidden])) .bubble{animation-play-state:paused}
 .plan h4,.p-sec h4{font-family:var(--f-body);font-size:12px;letter-spacing:.14em;color:var(--paper-ink-soft);margin:0 0 6px;font-weight:400}
 .plan ol{margin:0;padding-left:1.3em;font-family:var(--f-hand);font-size:25px;line-height:1.25;color:var(--paper-ink)}
 .plan ol li::marker{color:var(--paper-red)}
+.plan.steps{margin-top:0;border-top:0}
+.plan.steps ol{font-family:var(--f-body);font-size:15px;line-height:1.5;color:var(--paper-ink)}
 .p-view{display:flex;flex-direction:column;gap:20px;margin-top:18px}
 /* 깊이를 바꿀 때마다 나오므로 짧게. 큰 코드 블록에 blur를 걸면 비싸서 뺐다 */
 .p-view.enter{animation:inkin .2s cubic-bezier(.23,1,.32,1) both}

@@ -1105,6 +1105,10 @@ function showInfo(){
   let todo=((b.todoBy&&b.todoBy[state.line])||b.todo).map(t=>'<li>'+t+'</li>').join("");
   if(b.extra2&&state.line===2) todo+='<li class="extra">+ '+b.extra2+'</li>';
   document.getElementById("iTodo").innerHTML=todo;
+  // 실제로 하는 순서: 접어 두고, 펼치면 길(1·2·3선)에 맞는 순서가 나온다
+  const steps=stepsOf(b,state.line), det=document.getElementById("iSteps");
+  det.hidden=!steps.length; det.querySelector("summary").textContent="자세한 순서 · "+steps.length+"단계";
+  det.querySelector("ol").innerHTML=steps.map(t=>'<li>'+esc(t)+'</li>').join("");
   const tm=trampMode(), breaks=isToday()&&JOURNEY.trampolineFor()==="breaks-today";
   const again=(b.id==="sunday"&&isToday()&&dayIdx===0)?" 산 정상 칸을 한 번 더 누르면 이번 주 점프를 본다.":" 같은 칸을 한 번 더 누르면 두루마리가 펼쳐진다.";
   const gone=" 트램펄린은 이번 주에 이미 잃어서 빈 등으로 걷는다.";
@@ -1113,7 +1117,7 @@ function showInfo(){
       :"크게 늦은 날. 걸어서는 못 가서 트램펄린을 발밑에 깔고 억지로 튀어 간다. 오늘이 지나면 트램펄린은 망가진다.")+again
     :state.line===2?"서두르다 모자를 잃어버렸다("+(PLAN.leave?"집에 두고 나왔다":"꺼진 오전 칸 옆 풀밭")+"). 오늘은 하루 종일 맨머리로 다니고, 내일 아침엔 새 모자를 쓴다."
       +(breaks?" 이번 주 두 번째 2선이라 트램펄린도 오늘로 잃는다.":tm==="none"?gone:"")+(sideOpen()?" 오전이 꺼진 날엔 들꽃 샛길로 질러간다.":" 오늘은 큰길 옆 들꽃 샛길로 다닌다.")+again
-    :"다른 칸을 누르면 난쟁이가 큰길로 걸어간다."+(tm==="none"?gone:"")+again;
+    :"다른 칸을 누르면 소년이 큰길로 걸어간다."+(tm==="none"?gone:"")+again;
 }
 /* 일요일(오늘)에 산 정상 칸을 누르면: 정상까지 걸어가서 점프 연출을 본다. 이미 정상에 있으면 바로 */
 let jumpOnArrive=false;
@@ -1123,6 +1127,8 @@ nodesEl.addEventListener("click",e=>{ const n=e.target.closest(".node"); if(!n) 
   if(id==="sunday"&&sundayToday()){ jumpOnArrive=true; if(!walking&&at===id){ sel=id; showInfo(); decorate(); arrived(id); } else walkTo(id); return; }
   jumpOnArrive=false;
   if(id===sel&&!walking&&at===id) openScroll(id,n); else walkTo(id); });
+// 순서를 펼치면 안내판이 길어지므로, 장소 표지가 그 밑에 깔리지 않게 다시 놓는다
+document.getElementById("iSteps").addEventListener("toggle",()=>{ if(sceneMode==="day"){ buildOverlay(); decorate(); } });
 document.getElementById("enter").addEventListener("click",()=>openScroll(sel,document.querySelector('.node[data-id="'+sel+'"]')));
 
 function refresh(rerender){

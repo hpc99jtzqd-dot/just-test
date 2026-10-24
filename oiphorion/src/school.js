@@ -179,7 +179,7 @@ const EXAM_SAT=[
   examBlock("minimum",{name:"최소 기준선 · 시험 주말",story:"크게 늦은 날에도 250장을 한 번은 넘긴다.",
     todo:["250장 제목·굵은 글씨·정의만 훑기 (약 90분)","예상 문제 5개 만들어 답 적기","이것만 해도 막아 낸 날"]}),
   examBlock("hobby",{name:"취미 · 30분만",todo:["30분, 타이머 맞추고","시험 주말이라 짧게"]}),
-  examBlock("closing",{name:"마감 준비",todo:["23:00 화면 끄기","질문 목록 맨 위 3개 표시: 내일 아침 첫 블록","내일 할 일 5분 적기"]}),
+  examBlock("closing",{name:"마감 준비",when:()=>[1380,1440],todo:["23:00 화면 끄기","질문 목록 맨 위 3개 표시: 내일 아침 첫 블록","내일 할 일 5분 적기"]}),
   examBlock("camp",{}),
 ];
 const EXAM_SUN=[
@@ -200,7 +200,7 @@ const EXAM_SUN=[
   examBlock("minimum",{name:"최소 기준선 · 시험 전날",story:"크게 늦은 날에도 내일 들고 갈 한 장은 만든다.",
     todo:["A4 한 장 요약 만들기 (제목·정의·예제 위주)","예상 문제 10개 풀기","이것만 해도 막아 낸 날"]}),
   examBlock("hobby",{name:"취미 · 30분만",todo:["30분, 타이머 맞추고","시험 전날이라 짧게"]}),
-  examBlock("closing",{name:"마감 준비 · 시험 전날",todo:["23:00 화면 끄기","가방에 A4 요약 · 필기구 · 학생증","월 09:30 출발 · 통학 중 A4 한 장만 보기"]}),
+  examBlock("closing",{name:"마감 준비 · 시험 전날",when:()=>[1380,1440],todo:["23:00 화면 끄기","가방에 A4 요약 · 필기구 · 학생증","월 09:30 출발 · 통학 중 A4 한 장만 보기"]}),
   examBlock("camp",{story:"자정 전에 잔다. 시험 전날 밤샘은 하지 않는다."}),
 ];
 const EXAM_DAYS={"2026-10-24":EXAM_SAT,"2026-10-25":EXAM_SUN};
