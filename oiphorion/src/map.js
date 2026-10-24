@@ -1035,9 +1035,14 @@ function buildOverlay(){
     // 무대 위에 떠 있는 패널(머리말·안내판·데스크톱 일정 카드)은 표지가 피해 간다.
     const blocks=panelBlocks();
     const covered=(x,y,w)=>blocks.some(k=>x+w/2>k.l&&x-w/2<k.r&&y>k.t&&y-34<k.b);
+    // 외딴집(출발·오전 장면에서 보이게 둔 집)도 표지가 덮지 않게 위로 비켜 간다
+    const hb=(()=>{const [hx,hz]=MAP_SCENES.house,c=[0,3.8].map(h=>project(P3(hx,hz,h)));if(c[0][2]<4)return null;const hw=Math.abs(project(P3(hx+2.8,hz,1.8))[0]-c[0][0])+Math.abs(project(P3(hx,hz+2.8,1.8))[0]-c[0][0]);
+      return {l:c[0][0]-hw-4,r:c[0][0]+hw+4,t:c[1][1]-4,b:c[0][1]+4};})();
+    const onHouse=(x,y,w)=>hb&&x+w/2>hb.l&&x-w/2<hb.r&&y>hb.t&&y-34<hb.b;
     for(const c of candidates){const [x,z]=c.point||NXZ[c.id],p=project(P3(x+1.5,z+1,2.5)),w=c.route?138:66;
       if(p[2]<4||p[2]>150||p[0]<w/2+8||p[0]>VW.W-w/2-8||p[1]<VW.H*.32||p[1]>VW.H-75)continue;
-      let y=p[1];while(used.some(b=>Math.abs(b.x-p[0])<(b.w+w)/2+6&&Math.abs(b.y-y)<38))y-=40;
+      if(onHouse(p[0],p[1],w)){const sx=p[0]<(hb.l+hb.r)/2?hb.l-w/2-2:hb.r+w/2+2;if(sx>w/2+8&&sx<VW.W-w/2-8)p[0]=sx;}   // 집에 닿으면 먼저 옆으로(화면 안일 때만), 아니면 위로
+      let y=p[1];while(used.some(b=>Math.abs(b.x-p[0])<(b.w+w)/2+6&&Math.abs(b.y-y)<38)||onHouse(p[0],y,w))y-=40;
       if(y<VW.H*.28||covered(p[0],y,w))continue;used.push({x:p[0],y,w});
       markers.push(`<button type="button" data-place="${c.id}" ${c.route?'data-route="'+c.route+'"':''} aria-label="${c.label} 장소로 걷기" style="left:${p[0]}px;top:${y}px">${c.label}</button>`);
     }

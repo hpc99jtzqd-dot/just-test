@@ -94,7 +94,7 @@ body.wk-on #info,body.wk-on .stage .dwarf{display:none}
 .journey-day .stage.nogl #trail{display:block}
 .journey-day .stage.nogl{background:linear-gradient(#b7ddeb 0%,#e3edd4 42%,#a8c978 43%,#678647 100%)}
 #dayMarkers{position:absolute;inset:0;pointer-events:none}
-#dayMarkers button{position:absolute;transform:translate(-50%,-100%);padding:6px 10px;min-height:32px;pointer-events:auto;cursor:pointer;border-radius:5px;background:#fffae5e8;color:#3b5334;font:12px var(--f-game);border:1px solid #81966c}
+#dayMarkers button{position:absolute;transform:translate(-50%,-100%);padding:6px 10px;min-height:32px;pointer-events:auto;cursor:pointer;border-radius:5px;background:#fffae5e8;color:#3b5334;font:12px var(--f-game);border:1px solid #81966c;white-space:nowrap}
 #dayMarkers button:focus-visible{outline:3px solid #244c3c;outline-offset:3px}
 #dayMarkers button[data-route="1"]{border-bottom:4px solid #c6a574}
 #dayMarkers button[data-route="2"]{border-bottom:4px solid #729c46;background:#f6ffdceF}
