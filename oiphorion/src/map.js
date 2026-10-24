@@ -430,21 +430,20 @@ vec2 coniferT(vec3 v){float r=length(v.xz);
   float t3=max((r-.52-jag*.7+(v.y-4.95)*.62)*.75,abs(v.y-4.95)-.85);
   float f=min(min(t1,t2),t3),wood=max(r-.15+v.y*.03,abs(v.y-.65)-.65);
   return vec2(min(f,wood),wood<f?0.:1.);}
-// 활엽수(사진 7·민의 들판 나무): 잎 뭉치 여섯 개를 부드럽게 잇고, 나무마다 돌려 같은 모양이 반복되지 않게 한다.
-// 잎 덩어리 요철은 표면 가까이(c<.4)에서만 더하고 그 기울기만큼 보폭을 줄인다. 바깥은 요철 높이만큼 덜 가게 해 넘치지 않는다.
-// 줄기는 위로 가늘어지고, 수관 아래로 가지 셋이 갈라진다.
+// 활엽수(젤다 BotW풍): 아래가 굵고 살짝 휜 줄기가 네 갈래 가지로 갈라지고, 가지 끝마다 따로 떨어진 잎 뭉치가 달린다.
+// 뭉치 사이로 하늘이 보인다. 잎 요철은 낮은 주파수로 표면 근처에서만(보폭 .75배). 나무마다 돌려 같은 모양이 반복되지 않게.
 vec2 leafyT(vec3 v,float fi){vec3 w=rotY(v,fi*2.39);
-  float c=sdEll(w-vec3(0.,3.35,0.),vec3(1.5,1.1,1.4));
-  c=smin(c,sdEll(w-vec3(-1.05,3.,.35),vec3(.95,.8,.9)),.35);
-  c=smin(c,sdEll(w-vec3(1.,3.15,-.3),vec3(1.,.85,.95)),.35);
-  c=smin(c,sdEll(w-vec3(.15,4.2,.2),vec3(1.05,.85,1.)),.35);
-  c=smin(c,sdEll(w-vec3(-.45,3.85,-.85),vec3(.85,.72,.8)),.3);
-  c=smin(c,sdEll(w-vec3(.5,2.75,.95),vec3(.8,.6,.75)),.3);
-  if(c<.4)c=(c+.085*(sin(w.x*5.3+w.y*2.1)*sin(w.z*4.9-w.y*2.7)+.55*sin(w.y*6.1+w.x*3.3+w.z*2.3))+.035*sin(w.x*11.3+w.z*9.7+w.y*5.))*.5;  // 큰 덩어리 + 잔 잎뭉치
-  else c-=.14;
-  float wood=max(length(w.xz-vec2(.03*w.y,0.))-(.19-.03*w.y),abs(w.y-1.2)-1.2);
-  wood=min(wood,min(sdCap(w,vec3(0.,1.85,0.),vec3(-.8,2.9,.3),.075),sdCap(w,vec3(.02,1.75,0.),vec3(.75,2.95,-.25),.07)));
-  wood=min(wood,sdCap(w,vec3(0.,2.2,0.),vec3(.1,3.3,.6),.06));
+  vec2 bend=vec2(.12*sin(w.y*1.1+fi),.08*cos(w.y*.9+fi*1.7));
+  float wood=max(length(w.xz-bend)-(.27-.06*w.y),abs(w.y-1.15)-1.15);
+  vec3 J=vec3(.12*sin(2.37+fi),2.15,.08*cos(1.94+fi*1.7));
+  wood=min(wood,min(sdCap(w,J,vec3(-1.15,3.25,.35),.11),sdCap(w,J,vec3(1.05,3.45,-.35),.1)));
+  wood=min(wood,min(sdCap(w,J,vec3(.15,4.15,.25),.09),sdCap(w,J,vec3(.35,2.95,1.05),.08)));
+  float c=sdEll(w-vec3(-1.25,3.45,.4),vec3(1.,.78,.95));
+  c=smin(c,sdEll(w-vec3(1.1,3.7,-.4),vec3(.95,.75,.9)),.18);
+  c=smin(c,sdEll(w-vec3(.15,4.45,.25),vec3(1.05,.8,1.)),.18);
+  c=smin(c,sdEll(w-vec3(.4,3.15,1.15),vec3(.8,.62,.75)),.18);
+  c=smin(c,sdEll(w-vec3(-.35,3.9,-.85),vec3(.7,.55,.65)),.18);
+  if(c<.3)c=(c+.07*sin(w.x*4.3+w.y*2.7)*sin(w.z*4.1-w.y*3.3))*.75;else c-=.07;
   return vec2(min(c,wood),wood<c?0.:1.);}
 vec2 dayTreeD(vec3 p,vec4 a,float fi){float s=a.w/1.45;vec3 v=(p-a.xyz)/s+vec3(0.,2.35,0.);vec2 r=fi<CONIF?coniferT(v):leafyT(v,fi);return vec2(r.x*s,r.y);}
 // 색칠 단계에서만: 맞은 점에 가장 가까운 한 그루를 고르고(gTA·gTI) 그 나무 모양의 기울기로 법선을 잰다
@@ -465,7 +464,7 @@ vec2 obj(vec3 p,float foliage){
         dd=min(min(low,high),sdBox(v-vec3(0.,.55,0.),vec3(.10,.55,.10)))*s;}}
     if(dd<d){d=dd;id=2.;}}}
   for(int i=0;i<${ROCKS.length};i++){vec4 a=uRocks[i];vec3 q=rotY(p-a.xyz,.37+float(i)*.71);float bb=length(q)-2.;
-    float dd=bb>.3?bb:sdBox(q,vec3(1.35,.85,1.05))-.16;if(dd<d){d=dd;id=1.;}}
+    float dd=bb>.3?bb:uDay>.5?smin(sdEll(q-vec3(0.,-.1,0.),vec3(1.45,.85,1.1)),sdEll(q-vec3(.55,.25,.2),vec3(.8,.6,.7)),.3):sdBox(q,vec3(1.35,.85,1.05))-.16;if(dd<d){d=dd;id=1.;}}
   {vec3 q=p-uTent;float b=length(q+vec3(0.,1.7,0.))-3.;float dd=b>.3?b:sdCone(q,vec2(.5,.866),3.4);if(dd<d){d=dd;id=4.;}}
   {vec3 q=p-uSign;float b=length(q-vec3(0.,3.,0.))-3.5;
     if(b>.3){if(b<d){d=b;id=5.;}}
@@ -505,6 +504,7 @@ vec3 AMB=vec3(.30,.44,.78);
 vec3 fogit(vec3 c,float t,vec3 rd){
   vec3 hz=FOG;
   float f=min(.70,1.-exp(-max(t-FOG_START,0.)*FOG_DENSITY))*mix(1.,.45,smoothstep(-.04,.14,rd.y));  // 정상부는 덜 뿌옇게
+  if(uDay>.5)return mix(c,vec3(.60,.76,.92),smoothstep(45.,240.,t)*.32);  // 하루: 멀수록 푸르게 흐려지는 공기 원근
   // 주간 정상 둘레는 안개를 걷어 바위·눈 경계가 읽히게(비평 2-5)
   if(uDay<.5)f*=mix(.25,1.,smoothstep(20.,55.,length((uRo+rd*t).xz-vec2(${glslFloat(NXZ.sunday[0])},${glslFloat(NXZ.sunday[1])}))));
   return mix(c,hz*1.02,f);
@@ -531,7 +531,8 @@ vec3 shadeGround(vec3 p,vec3 rd,float t){
   // 밝은 석회암 자갈. 패임 없이 가는 등산로로 이어진다.
   vec3 gravel=mix(vec3(.20,.19,.16),vec3(.49,.48,.43),1.-smoothstep(.15,1.2,min(q,min(pq.x,pq.y))));
   gravel*=.94+.12*n2;
-  if(uDay>.5){alb=mix(vec3(.045,.13,.018),vec3(.19,.34,.045),n2*.6+n1*.4);gravel=mix(vec3(.31,.24,.13),vec3(.60,.50,.30),n2);gravel=mix(gravel,vec3(.11,.24,.035),side*.85);}
+  if(uDay>.5){float wind=vn(vec2(dot(p.xz,vec2(.8,.6))*.32,dot(p.xz,vec2(-.6,.8))*4.2));  // 바람에 쓸린 풀 결(한 방향으로 긴 잡음)
+    alb=mix(vec3(.05,.14,.02),vec3(.21,.38,.05),n1*.72+n2*.13+wind*.15);alb=mix(alb,vec3(.28,.42,.07),smoothstep(.65,.95,wind)*.18);gravel=mix(vec3(.31,.24,.13),vec3(.60,.50,.30),n2);gravel=mix(gravel,vec3(.11,.24,.035),side*.85);}
   alb=mix(alb,gravel,trail);
   if(uDay>.5){
     // 큰길 바로 옆은 키 큰 풀과 들꽃 띠: 풀 깎은 길과 대비된다(사진 5). 지오메트리 없이 재질만.
@@ -568,7 +569,7 @@ vec3 shadeGround(vec3 p,vec3 rd,float t){
     float canopy=0.;
     for(int i=0;i<${M.treeCount*3};i+=3){vec4 tr=uTrees[i];canopy=max(canopy,1.-smoothstep(tr.w,tr.w*2.7,length(p.xz-tr.xz-vec2(1.8,-1.2))));}
     float leaves=smoothstep(.35,.65,vn(p.xz*1.3)+.22*vn(p.xz*3.8));
-    dif*=mix(1.,mix(.46,1.,leaves),canopy);ao=max(.62,ao);
+    dif*=mix(1.,mix(.72,1.,leaves),canopy);ao=max(.62,ao);
   }
   vec3 col=alb*(SUN*dif+AMB*(.55+.45*n.y)*ao+lin(vec3(.5,.62,.4))*.12*max(-n.y,0.));
   col+=alb*AMB*.12*pow(1.-max(dot(n,-rd),0.),3.);
@@ -594,7 +595,7 @@ vec3 shadeObj(vec3 p,vec3 rd,float id,float t){
   // his cap and trampoline retain their original precise tetrahedral normal.
   vec3 n;
   if(uDay>.5&&id>1.5&&id<2.5){pickDayTree(p);n=dayTreeN(p);}else n=objN(p);
-  float leafGlow=0.,boy=0.,skin=0.;
+  float leafGlow=0.,boy=0.,skin=0.,toon=0.;
   float sh=shadow(p+n*.06,0.);
   float dif=max(dot(n,uL),0.)*sh;
   vec3 alb=vec3(.5);float spec=0.,gloss=8.,emi=0.;
@@ -657,33 +658,33 @@ vec3 shadeObj(vec3 p,vec3 rd,float id,float t){
   } else if(id<1.5){
     alb=mix(ROCK_DARK,ROCK,vn(p.xz*.7+p.y*.8));
     alb=mix(alb,SNOW,smoothstep(SNOW_START,SNOW_END,p.y)*smoothstep(.35,.78,n.y));
+    if(uDay>.5){float tone=smoothstep(.32,.72,(dot(n,uL)*.5+.5)*mix(.55,1.,sh));toon=1.;  // 하루: 둥근 회색 바위, 윗면은 이끼
+      alb=mix(vec3(.07,.075,.08),vec3(.40,.41,.40),tone);alb=mix(alb,mix(vec3(.04,.08,.02),vec3(.22,.36,.08),tone),smoothstep(.45,.85,n.y+.25*vn(p.xz*1.7)));}
   } else if(id<2.5){
     float v=vn(p.xz*1.7+p.y*1.3)*.6+vn(p.xz*4.3-p.y*3.1)*.4;
     alb=mix(TREE_DARK,TREE,v*.7+smoothstep(-.2,.9,n.y)*.35);
     if(uDay>.5){
+      // BotW풍: 잔무늬 대신 큰 면의 부드러운 2단 명암. 빛은 색에 넣고 마지막 조명은 평평하게(toon)
       float s=gTA.w/1.45;vec3 tv=(p-gTA.xyz)/s+vec3(0.,2.35,0.);bool con=gTI<CONIF;
       vec2 part=con?coniferT(tv):leafyT(tv,gTI);
-      if(part.y<.5){  // 줄기·가지: 세로 결이 있는 나무껍질
-        vec3 w=con?tv:rotY(tv,gTI*2.39);float an=atan(w.z,w.x);
-        alb=mix(vec3(.07,.04,.02),vec3(.24,.15,.075),vn(vec2(an*2.5,w.y*7.))*.7+vn(vec2(an*9.,w.y*2.))*.3);
+      float tone=smoothstep(.32,.72,(dot(n,uL)*.5+.5)*mix(.55,1.,sh));toon=1.;
+      if(part.y<.5){  // 줄기·가지: 갈색 나무껍질, 위를 향한 면엔 이끼
+        vec3 w=con?tv:rotY(tv,gTI*2.39);
+        alb=mix(vec3(.045,.028,.016),vec3(.27,.17,.085),tone)*(.88+.24*vn(vec2(atan(w.z,w.x)*2.,w.y*3.)));
+        alb=mix(alb,mix(vec3(.04,.08,.02),vec3(.20,.33,.07),tone),smoothstep(.15,.75,n.y+.3*vn(w.xz*3.+w.y*2.))*.75);
       }else if(con){
-        // 침엽수: 층마다 아래 끝은 밝은 새순, 윗단 치마 밑은 그늘, 세로 바늘잎 결
+        // 침엽수: 짙은 청록 2단 명암, 층마다 가지 끝은 밝은 새순, 윗단 치마 밑은 그늘
         float ty=tv.y,tf=ty<2.6?(ty-.95)/1.65:ty<4.1?(ty-2.6)/1.5:(ty-4.1)/1.7;
-        n=normalize(vec3(n.x,max(n.y,-.15)+.3,n.z));  // 층 아랫면도 하늘빛을 받게(검은 띠 방지)
-        float an=atan(tv.z,tv.x),needle=vn(vec2(an*14.,ty*9.)),rows=.5+.5*sin(ty*22.+an*3.);  // 세로 바늘잎 결 + 층 안의 가지 줄
-        alb=mix(vec3(.010,.045,.026),vec3(.07,.17,.085),v*.4+needle*.35+max(n.y,0.)*.3)*(1.-.6*smoothstep(.5,1.,tf))*(.7+.45*needle)*(.82+.28*rows);
-        alb=mix(alb,vec3(.13,.24,.07),(1.-smoothstep(0.,.18,tf))*.55);
+        alb=mix(vec3(.010,.042,.032),vec3(.08,.20,.095),tone);
+        alb=mix(alb,vec3(.22,.36,.10),(1.-smoothstep(0.,.22,tf))*.45*tone);
+        alb*=1.-.4*smoothstep(.55,1.,tf);
       }else{
-        // 활엽수: 잎 뭉치마다 밝기가 다르고, 뭉치 사이 골과 수관 안쪽은 그늘. 해를 등진 잎은 비쳐 빛난다(leafGlow)
+        // 활엽수 잎: 그늘 청록 → 밝은 연두, 해를 향한 윗면은 노란 연두. 낮은 주파수 결만 살짝
         vec3 w=rotY(tv,gTI*2.39);
-        float clump=h12(floor(w.xz*1.6+vec2(w.y*1.2,-w.y*.8)+gTI*7.));
-        float inner=smoothstep(.9,2.1,length((w-vec3(0.,3.45,0.))*vec3(1.,1.25,1.)));
-        alb=mix(vec3(.020,.065,.014),vec3(.17,.31,.05),clamp(.2+.45*clump+.3*v+max(n.y,0.)*.25,0.,1.))*(.45+.55*inner);
-        // 잎 결: 큰 잎 뭉치 + 잔잎 두 겹. 깊은 틈은 어둡게, 잎마다 빛 받는 방향을 조금씩 틀어 반짝이게(모양 비용 없음)
-        float f1=vn(w.xz*6.5+vec2(w.y*4.1,-w.y*3.3)),f2=vn(w.xz*15.+vec2(w.y*11.,w.y*7.)),leaves=f1*.65+f2*.35;
-        alb*=.6+.7*leaves;alb=mix(alb*.3,alb,smoothstep(.2,.42,leaves));
-        n=normalize(n+(vec3(f1,f2,f1*f2)-.5)*.6);
-        leafGlow=inner*smoothstep(.3,.6,leaves);
+        alb=mix(vec3(.026,.08,.048),vec3(.19,.40,.065),tone);
+        alb=mix(alb,vec3(.44,.60,.12),smoothstep(.5,.95,n.y)*tone*.55);
+        alb*=(.9+.2*vn(w.xz*3.2+vec2(w.y*2.3,-w.y*1.7)))*(.72+.28*smoothstep(-.7,.3,n.y));
+        leafGlow=1.;
       }}
     n=normalize(n+vec3(v-.5)*.16);dif=max(dot(n,uL),0.)*sh;spec=.015;gloss=6.;
   } else if(id<3.5){alb=lin(vec3(.48,.34,.22));
@@ -696,12 +697,13 @@ vec3 shadeObj(vec3 p,vec3 rd,float id,float t){
   } else {alb=lin(vec3(.98,.98,.97));emi=id>9.25?.9:.3;}
   if(skin>.5)dif=max((dot(n,uL)+.45)/1.45,0.)*mix(.55,1.,sh);  // 피부는 빛이 부드럽게 감싼다
   vec3 col=alb*(SUN*dif+AMB*(.6+.4*n.y));
+  if(toon>.5){col=alb*(SUN*.36+AMB*.55);spec=0.;}  // 명암은 이미 색에 들어 있다
   col+=SUN*spec*pow(max(dot(normalize(uL-rd),n),0.),gloss)*sh*(gloss>50.?1.2:.3);
   col+=spec*sky(ref)*(.08+.9*fre)*(gloss>50.?1.:.3);
   col+=alb*emi*vec3(1.,.97,.9);
   if(uDay>.5){
     // 해를 등진 잎은 햇빛이 비쳐 연둣빛으로 빛난다(수관 바깥쪽만)
-    col+=vec3(.16,.26,.03)*leafGlow*pow(max(dot(rd,uL),0.),2.)*(.4+.6*sh);
+    col+=vec3(.20,.32,.04)*leafGlow*pow(max(dot(rd,uL),0.),2.)*(.4+.6*sh);
     // 소년: 그늘진 피부의 따뜻한 혈색, 그리고 몸 가장자리 윤곽 빛으로 배경에서 또렷이 뜬다
     col+=alb*vec3(.30,.09,.05)*skin*(1.-dif);
     col+=vec3(.95,.93,1.)*.45*boy*pow(1.-max(dot(n,-rd),0.),3.)*(.35+.65*clamp(dot(n,uL)+.4,0.,1.));
@@ -775,7 +777,7 @@ void main(){
   col=1.-exp(-col*1.85);
   col=pow(col,vec3(1./2.2));
   col=mix(vec3(dot(col,vec3(.299,.587,.114))),col,1.05);
-  if(uDay>.5)col=mix(col,col*vec3(1.02,.97,1.05)+vec3(.035,.02,.05),.55);  // 파스텔 그레이딩: 그늘을 라벤더 쪽으로 살짝 들어 올림
+  if(uDay>.5)col=mix(col,col*vec3(1.02,.97,1.05)+vec3(.035,.02,.05),.15);  // 파스텔 그레이딩: 그늘을 라벤더 쪽으로 살짝 들어 올림
   float vg=1.-.12*dot(uv*.5,uv*.5);col*=vg;
   col+=(h12(gl_FragCoord.xy)-.5)/255.;
   gl_FragColor=vec4(col,1.);
