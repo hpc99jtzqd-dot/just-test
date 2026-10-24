@@ -168,9 +168,9 @@ const ROCKS=[[-15,-13],[29,-24],[41,9],[-29,7]];
 const TENT=[25.5,-6.8], SIGN=[-35,29.5], FLAG=[19.9,-34];
 const CLOUD_Y=-14, CLOUD_AMP=2.4, DOOR=[-63,-11];
 /* 모든 풍경색은 선형 RGB. 지형/길/텍스처를 공유하고 프로그램 상수만 바꾼다. */
-const ALPINE_PALETTE=Object.freeze({grassDark:[.020,.060,.022],grass:[.055,.160,.032],dry:[.130,.190,.045],treeDark:[.010,.032,.023],tree:[.035,.095,.052],rockDark:[.170,.190,.200],rock:[.310,.330,.340],snow:[.660,.740,.810],packed:[.340,.470,.620],fog:[.600,.720,.800]});
+const ALPINE_PALETTE=Object.freeze({grassDark:[.020,.060,.022],grass:[.055,.160,.032],dry:[.130,.190,.045],treeDark:[.010,.032,.023],tree:[.035,.095,.052],rockDark:[.120,.135,.150],rock:[.235,.250,.262],snow:[.660,.740,.810],packed:[.340,.470,.620],fog:[.600,.720,.800]});
 const MAPS=[
-  ['들꽃의 산기슭',8,.82,11,20,25.5,30,'#94af5c',.003],
+  ['들꽃의 산기슭',8,.82,22,33,30,34.5,'#94af5c',.003],
   ['안개 낀 침엽수림',8,.86,10,19,24,29,'#427564',.004],
   ['바람의 바위 능선',6,.90,8,17,21,26,'#8d999d',.003],
   ['푸른 빙하의 길',4,.93,6,15,18,23,'#8bb9cf',.0028],
@@ -1091,7 +1091,7 @@ function walkTo(id){
   const fm=feetMode(), dur=Math.max(fm?600:350,Math.min(fm?1800:1400,total*(fm?28:22))), hopLen=Math.max(fm?6:2.6,total/dur*1000*(fm?.4:.2)), hopH=fm?2.6:.95, t0=performance.now();
   const v=Math.min(2.5,v0*dur/total), ease=k=>v*k+(3-2*v)*k*k+(v-2)*k*k*k;
   maxHop=0;
-  dw.classList.remove("idle"); walking={to:id,pos:pts[0].slice(),vel:[0,0],t:t0};
+  dw.classList.remove("idle"); walking={to:id,pos:pts[0].slice(),vel:[0,0],t:t0,drawn:0};
   const step=now=>{
     const k=Math.min(1,(now-t0)/dur), d=ease(k)*total;
     let i=1; while(i<cum.length-1&&cum[i]<d) i++;
@@ -1100,7 +1100,8 @@ function walkTo(id){
     const a=project([pts[i-1][0],0,pts[i-1][1]]), b=project([pts[i][0],0,pts[i][1]]); dw.classList.toggle("flip",b[0]<a[0]-.01);
     const want=Math.atan2(-(pts[i][0]-pts[i-1][0]),pts[i][1]-pts[i-1][1]); DW.yaw=DW.yaw+(angTo(DW.yaw,want)-DW.yaw)*.18;
     const ph=(d/hopLen)%1, hop=Math.sin(ph*Math.PI)*hopH*(1-Math.pow(1-Math.min(1,k*6),2))*(k>.97?0:1), sq=ph<.12||ph>.88?(fm?1:.8):0;
-    placeDwarf(x,z,hop,sq*(k<.98?1:0),DW.yaw);
+    // 걷는 동안 다시 그리기는 초당 30번(느린 기기면 20번)까지만. 위치는 시간으로 정해지므로 속도는 같고, 도착 자리는 아래에서 꼭 그린다.
+    if(k>=1||!gl||now-walking.drawn>=(QUALITY<1?50:33)){ walking.drawn=now; placeDwarf(x,z,hop,sq*(k<.98?1:0),DW.yaw); }
     if(k<1) walking.raf=requestAnimationFrame(step); else { walking=null; at=id; dw.classList.add("idle"); placeDwarf(NXZ[id][0],NXZ[id][1]); arrived(id); }
   };
   walking.raf=requestAnimationFrame(step);
