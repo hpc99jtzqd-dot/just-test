@@ -267,10 +267,11 @@ vec3 sky(vec3 rd){
   float e=rd.y,az=atan(rd.x,-rd.z);
   if(uDay>.5){
     vec3 c=mix(vec3(.72,.87,.98),vec3(.22,.50,.98),smoothstep(-.02,.62,e));  // 맑은 파스텔 하늘, 지평선만 연하게
+    c=mix(c,vec3(1.,.80,.86),.55*(1.-smoothstep(0.,.17,e)));  // 드림코어: 지평선은 복숭아·분홍빛
     vec2 cp=vec2(mod(az+.65,1.3)-.65,(e-.35)*1.8);
     float puff=min(length(cp)-.16,min(length(cp-vec2(.14,.04))-.12,length(cp+vec2(.13,.02))-.13));
     float clouds=1.-smoothstep(-.012,.022,puff);
-    c=mix(c,mix(vec3(.70,.77,.88),vec3(1.,.98,.96),smoothstep(.20,.48,e)),clouds*.94);
+    c=mix(c,mix(vec3(.84,.76,.92),vec3(1.,.98,.96),smoothstep(.20,.48,e)),clouds*.94);  // 구름 그늘은 라벤더
     float moon=1.-smoothstep(.024,.029,length(vec2(az+.48,e-.43)));c=mix(c,vec3(.95,.98,1.),moon*.85);
     c+=vec3(.15,.10,.04)*pow(max(0.,dot(rd,normalize(vec3(-.62,.66,.42)))),18.);
     // Two distant woodland layers close the open horizon, without ray objects.
@@ -283,6 +284,15 @@ vec3 sky(vec3 rd){
     float frame=(1.-smoothstep(.024,.028,abs(door.x)))*(1.-smoothstep(.054,.058,abs(door.y)));
     float cloudlet=1.-smoothstep(.85,1.05,length((door+vec2(0.,.065))/vec2(.11,.03)));
     c+=vec3(1.,.96,.86)*.32*exp(-dot(door/vec2(.06,.10),door/vec2(.06,.10)));  // 문 뒤 은은한 빛
+    // 드림코어 장치 둘. 모두 화면 좌표의 식 몇 줄이라 하늘 픽셀에서만 계산되고 반복문도 없다.
+    // ① 문 뒤 옅은 무지개 고리: 문 아래를 중심으로 한 반원, 바깥 빨강 → 안쪽 보라
+    float rr=(length((door-vec2(0.,-.10))*vec2(1.,1.15))-.17)/.05;
+    vec3 bow=.55+.45*cos(6.2832*(clamp(rr,0.,1.)*.75+vec3(0.,.33,.67)));
+    c=mix(c,bow,.20*smoothstep(0.,.25,rr)*(1.-smoothstep(.75,1.,rr))*smoothstep(-.06,.02,door.y+.10)*smoothstep(.02,.10,e));
+    // ② 하늘에 떠서 문으로 이어지는 계단: 구름 조각 왼쪽에서 아래로 다섯 칸, 멀어질수록 희미하게 녹는다
+    float si=floor((-door.x-.10)/.045), top=-.075-si*.03;
+    float stair=step(0.,si)*step(si,4.)*(1.-smoothstep(.0,.004,door.y-top))*smoothstep(-.016,-.012,door.y-top);
+    c=mix(c,mix(vec3(.80,.80,.92),vec3(1.,.99,.97),smoothstep(-.006,-.002,door.y-top)),stair*(1.-si*.17));
     c=mix(c,vec3(.96,.95,1.),cloudlet*.96);
     float rim=(1.-smoothstep(.029,.033,abs(door.x)))*(1.-smoothstep(.059,.063,abs(door.y)))*(1.-frame);
     c=mix(c,vec3(.14,.18,.30),rim*.8);  // 옅은 남회색 윤곽: 흰 구름 앞에서도 문 모양이 읽힌다
@@ -715,6 +725,7 @@ void main(){
   col=1.-exp(-col*1.85);
   col=pow(col,vec3(1./2.2));
   col=mix(vec3(dot(col,vec3(.299,.587,.114))),col,1.05);
+  if(uDay>.5)col=mix(col,col*vec3(1.02,.97,1.05)+vec3(.035,.02,.05),.55);  // 파스텔 그레이딩: 그늘을 라벤더 쪽으로 살짝 들어 올림
   float vg=1.-.12*dot(uv*.5,uv*.5);col*=vg;
   col+=(h12(gl_FragCoord.xy)-.5)/255.;
   gl_FragColor=vec4(col,1.);
