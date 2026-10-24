@@ -93,6 +93,10 @@ h1{font-family:var(--f-game);font-weight:400;font-size:clamp(30px,3.7vw,54px);li
 .i-steps[open] summary::before{transform:rotate(90deg)}
 .i-steps summary:focus-visible{outline:2px solid var(--ink);outline-offset:2px;border-radius:6px}
 .i-steps ol{margin:2px 0 4px;padding-left:2em;display:flex;flex-direction:column;gap:2px;line-height:1.45;max-height:min(42vh,320px);overflow:auto}
+.i-steps label{display:flex;gap:8px;align-items:flex-start;cursor:pointer;min-height:24px;padding:1px 0}
+.i-steps input{flex:none;width:16px;height:16px;margin:2px 0 0;accent-color:var(--leaf)}
+.i-steps input:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.i-steps li.done span{color:var(--ink-soft);text-decoration:line-through}
 .i-steps li::marker{color:var(--aqua-deep);font-variant-numeric:tabular-nums}
 .i-hint{margin:0;font-size:12px;color:var(--ink-soft);position:relative}
 .foot{font-size:12px;color:#f2fbec;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:18px 28px;max-width:62em}

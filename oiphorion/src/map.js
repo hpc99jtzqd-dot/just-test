@@ -832,6 +832,14 @@ function doorSpot(){
   }
   return best||[9,9,[]];  // 빈 하늘이 없으면 문은 이번 장면에서 쉰다
 }
+/* 느린 기기 보호: 풍경 한 장이 3초를 넘기면 다음부터 픽셀 수를 0.7배로(최소 0.35배),
+   0.9초 안에 끝나면 다시 올린다. 이 기기에만 기억한다. 화면은 CSS가 늘려 보여 주므로 조금 부드러워질 뿐이다. */
+let QUALITY=Math.max(.35,Math.min(1,+store.get("oi.quality")||1));
+function adaptQuality(ms){
+  const q=ms>3000?Math.max(.35,QUALITY*.7):ms<900?Math.min(1,QUALITY/.7):QUALITY;
+  if(q!==QUALITY){ QUALITY=q; store.set("oi.quality",String(q)); }
+  window.__quality=QUALITY;
+}
 function render(){
   if(!gl) return;
   if((mapNo!==compiledMap||sceneMode!==compiledScene)&&!useMapProgram(mapNo))mapNo=compiledMap;
@@ -840,7 +848,7 @@ function render(){
   const renderStart=performance.now();
   const dpr=Math.min(window.devicePixelRatio||1,1);
   let w=Math.round(VW.W*dpr), h=Math.round(VW.H*dpr);
-  const cap=sceneMode==="day"?420000:650000; if(w*h>cap){ const k=Math.sqrt(cap/(w*h)); w=Math.round(w*k); h=Math.round(h*k); }
+  const cap=(sceneMode==="day"?420000:650000)*QUALITY; if(w*h>cap){ const k=Math.sqrt(cap/(w*h)); w=Math.round(w*k); h=Math.round(h*k); }
   cv.width=w; cv.height=h; gl.viewport(0,0,w,h);
   gl.uniform2f(U.uRes,w,h); gl.uniform3fv(U.uRo,CAM.ro); gl.uniform3fv(U.uCu,CAM.cu); gl.uniform3fv(U.uCv,CAM.cv); gl.uniform3fv(U.uCw,CAM.cw); gl.uniform1f(U.uFl,CAM.fl);
   gl.uniform1f(U.uSignRot,Math.atan2(CAM.ro[0]-SIGN[0],CAM.ro[2]-SIGN[1]));
@@ -849,7 +857,7 @@ function render(){
   gl.enable(gl.SCISSOR_TEST);
   const band=Math.max(6,Math.floor(140000/w)); let y=h; raster.done=false; stageEl.classList.add("painting");
   const step=()=>{ const y0=Math.max(0,y-band); gl.scissor(0,y0,w,y-y0); gl.drawArrays(gl.TRIANGLES,0,3); y=y0;
-    if(y>0) raster.raf=requestAnimationFrame(step); else { gl.finish(); window.__renderMs=performance.now()-renderStart; if(!window.__firstRenderMs)window.__firstRenderMs=performance.now(); window.__renderScene=sceneMode; raster.done=true; stageEl.classList.remove("painting"); if(DW.dirty) drawDwarf(); window.__rendered=(window.__rendered||0)+1; } };
+    if(y>0) raster.raf=requestAnimationFrame(step); else { gl.finish(); window.__renderMs=performance.now()-renderStart; adaptQuality(window.__renderMs); if(!window.__firstRenderMs)window.__firstRenderMs=performance.now(); window.__renderScene=sceneMode; raster.done=true; stageEl.classList.remove("painting"); if(DW.dirty) drawDwarf(); window.__rendered=(window.__rendered||0)+1; } };
   raster.raf=requestAnimationFrame(step);
 }
 
@@ -907,7 +915,7 @@ function buildOverlay(){
 function decorate(){
   const now=nowId();
   nodesEl.querySelectorAll(".node").forEach(n=>{ const id=n.dataset.id, b=byId(id);
-    n.classList.toggle("off",isOff(b)); n.classList.toggle("now",id===now); n.classList.toggle("sel",id===sel); n.classList.toggle("secret",id==="minimum"); });
+    n.classList.toggle("off",isOff(b)); n.classList.toggle("now",id===now); n.classList.toggle("sel",id===sel); n.classList.toggle("secret",id==="minimum"); n.classList.toggle("done",allDone(id)); });
   stageEl.dataset.line=state.line;
 }
 /* ───── 난쟁이 ─────
@@ -1106,9 +1114,9 @@ function showInfo(){
   if(b.extra2&&state.line===2) todo+='<li class="extra">+ '+b.extra2+'</li>';
   document.getElementById("iTodo").innerHTML=todo;
   // 실제로 하는 순서: 접어 두고, 펼치면 길(1·2·3선)에 맞는 순서가 나온다
-  const steps=stepsOf(b,state.line), det=document.getElementById("iSteps");
-  det.hidden=!steps.length; det.querySelector("summary").textContent="자세한 순서 · "+steps.length+"단계";
-  det.querySelector("ol").innerHTML=steps.map(t=>'<li>'+esc(t)+'</li>').join("");
+  const steps=stepsOf(b,state.line), det=document.getElementById("iSteps"), done=doneSet(b.id);
+  det.hidden=!steps.length; stepsSummary(steps.length,done.size);
+  det.querySelector("ol").innerHTML=steps.map((t,i)=>'<li'+(done.has(i)?' class="done"':'')+'><label><input type="checkbox" data-i="'+i+'"'+(done.has(i)?' checked':'')+'><span>'+esc(t)+'</span></label></li>').join("");
   const tm=trampMode(), breaks=isToday()&&JOURNEY.trampolineFor()==="breaks-today";
   const again=(b.id==="sunday"&&isToday()&&dayIdx===0)?" 산 정상 칸을 한 번 더 누르면 이번 주 점프를 본다.":" 같은 칸을 한 번 더 누르면 두루마리가 펼쳐진다.";
   const gone=" 트램펄린은 이번 주에 이미 잃어서 빈 등으로 걷는다.";
@@ -1127,6 +1135,25 @@ nodesEl.addEventListener("click",e=>{ const n=e.target.closest(".node"); if(!n) 
   if(id==="sunday"&&sundayToday()){ jumpOnArrive=true; if(!walking&&at===id){ sel=id; showInfo(); decorate(); arrived(id); } else walkTo(id); return; }
   jumpOnArrive=false;
   if(id===sel&&!walking&&at===id) openScroll(id,n); else walkTo(id); });
+/* 오늘 한 순서: 체크하면 이 기기에 날짜·칸·길별로 기억한다(localStorage, 일주일 지나면 지움).
+   규칙·기록(JOURNEY)과는 무관한 개인 메모라 db에 쓰지 않는다. 칸의 순서를 다 하면 일정 카드에 ✓ */
+const STEPS_KEY="oi.steps";
+function stepsLog(){ try{ return JSON.parse(store.get(STEPS_KEY)||"{}")||{}; }catch(e){ return {}; } }
+const stepsKey=id=>selectedDate()+"|"+id+"|"+state.line;
+function doneSet(id){ return new Set(stepsLog()[stepsKey(id)]||[]); }
+function setDone(id,i,on){
+  const log=stepsLog(), k=stepsKey(id), s=new Set(log[k]||[]); if(on) s.add(i); else s.delete(i); log[k]=[...s];
+  const cutoff=new Date(Date.parse(JOURNEY.todayKey()+"T00:00:00Z")-7*864e5).toISOString().slice(0,10);
+  for(const key of Object.keys(log)) if(key.split("|")[0]<cutoff||!log[key].length) delete log[key];
+  store.set(STEPS_KEY,JSON.stringify(log));
+}
+function allDone(id){ const b=byId(id), n=b?stepsOf(b,state.line).length:0; return n>0&&doneSet(id).size>=n; }
+function stepsSummary(n,k){ document.querySelector("#iSteps summary").textContent="자세한 순서 · "+(k?k+"/"+n+" 했음":n+"단계"); }
+document.getElementById("iSteps").addEventListener("change",e=>{
+  const box=e.target.closest("input[data-i]"); if(!box) return;
+  setDone(sel,+box.dataset.i,box.checked); box.closest("li").classList.toggle("done",box.checked);
+  stepsSummary(stepsOf(byId(sel),state.line).length,doneSet(sel).size); decorate();
+});
 // 순서를 펼치면 안내판이 길어지므로, 장소 표지가 그 밑에 깔리지 않게 다시 놓는다
 document.getElementById("iSteps").addEventListener("toggle",()=>{ if(sceneMode==="day"){ buildOverlay(); decorate(); } });
 document.getElementById("enter").addEventListener("click",()=>openScroll(sel,document.querySelector('.node[data-id="'+sel+'"]')));

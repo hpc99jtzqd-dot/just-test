@@ -249,6 +249,21 @@ test('V3 3선 당일엔 발밑, 다음 날부터 망가진 트램펄린이 최�
   });
 });
 
+test('V3 자세한 순서 체크는 그날 칸·길별로 남고, 다 하면 카드에 ✓', () => session('2026-11-06T13:10', { fixture: 'keep' }, async (p, db) => {
+  await p.locator('#iSteps summary').click();
+  const boxes = p.locator('#iSteps input'), n = await boxes.count();
+  assert.ok(n >= 3, '순서가 여러 단계');
+  await boxes.nth(0).check();
+  assert.match(await p.locator('#iSteps summary').textContent(), /1\/\d+ 했음/);
+  assert.equal(await p.locator('.node.done').count(), 0);
+  for (let i = 1; i < n; i++) await boxes.nth(i).check();
+  assert.equal(await p.locator('.node.done[data-id="lunch"]').count(), 1, '다 하면 ✓');
+  await p.locator('#enter').click();
+  assert.equal(await p.evaluate(() => paper.scrollTop), 0, '두루마리는 맨 위부터');
+  assert.equal(await p.locator('.plan.steps li.done').count(), n);
+  assert.equal(db.writeCount(), 0, '개인 메모라 db에 쓰지 않음');
+}));
+
 (async () => {
   let failed = 0;
   browser = await chromium.launch({ args });

@@ -46,7 +46,8 @@ function view(){
     h+='<section class="plan"><h4>계획표</h4><ol>'+((b.todoBy&&b.todoBy[state.line])||b.todo).map(t=>'<li>'+esc(t)+'</li>').join("")+
        (b.extra2&&state.line===2?'<li>'+esc(b.extra2)+'</li>':"")+'</ol></section>';
     const steps=stepsOf(b,state.line);
-    if(steps.length) h+='<section class="plan steps"><h4>이렇게 한다</h4><ol>'+steps.map(t=>'<li>'+esc(t)+'</li>').join("")+'</ol></section>';
+    const done=doneSet(b.id);
+    if(steps.length) h+='<section class="plan steps"><h4>이렇게 한다'+(done.size?' · 오늘 '+done.size+'/'+steps.length:'')+'</h4><ol>'+steps.map((t,i)=>'<li'+(done.has(i)?' class="done"':'')+'>'+esc(t)+'</li>').join("")+'</ol></section>';
     h+='<div class="p-view enter">';
     b.pseudo.forEach(p=>{
       const s=SRC[p.src];
@@ -63,10 +64,8 @@ function view(){
     h+='<div class="p-actions"><button class="ghost" data-go="1">← 수도코드로</button><span class="toast" id="toast" role="status"></span><button class="deeper" data-copy="1">C++ 전체 복사</button></div></div>';
   }
   body.innerHTML=h;
-  if(level===1){
-    const first=body.querySelector(".ln.hl");
-    if(first){ const top=first.getBoundingClientRect().top-paper.getBoundingClientRect().top+paper.scrollTop; paper.scrollTop=Math.max(0,top-paper.clientHeight*0.45); }
-  } else paper.scrollTop=0;
+  // 맨 위(계획표와 '이렇게 한다')부터 보인다. 수도코드의 이 블록 줄은 ▸ 표시로 찾는다.
+  paper.scrollTop=0;
 }
 function openScroll(id,tile){
   cur=ALL.find(b=>b.id===id); if(!cur) return;

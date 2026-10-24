@@ -3,6 +3,7 @@
 .stage.painting #gl{cursor:progress}
 .node{position:absolute;width:calc(var(--rx) * 2.4 + 16px);height:calc(var(--ry) * 2.8 + 24px);transform:translate(-50%,-50%);border-radius:50%;padding:0;border:0;background:none;cursor:pointer;z-index:3;font:inherit;color:inherit}
 .ring{position:absolute;left:50%;top:50%;margin:calc(var(--ry) * -1.35) 0 0 calc(var(--rx) * -1.35);width:calc(var(--rx) * 2.7);height:calc(var(--ry) * 2.7);border-radius:50%;pointer-events:none;opacity:0}
+.node.done .tag strong::after{content:" ✓";color:var(--leaf)}
 .node.now .ring{opacity:1;border:2px solid rgba(190,255,140,.95);box-shadow:0 0 14px rgba(160,255,110,.8);animation:pulse 1.8s ease-in-out infinite}
 .node.sel .ring{opacity:1;border:2.5px solid #fff;box-shadow:0 0 0 2px rgba(18,166,214,.75),0 0 18px rgba(120,220,255,.9)}
 @keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.18);opacity:.55}}
