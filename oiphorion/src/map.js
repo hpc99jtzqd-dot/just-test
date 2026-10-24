@@ -229,6 +229,7 @@ const float uDay=${sceneMode==='day'?'1.':'0.'}; const float CONIF=${sceneMode==
 uniform sampler2D uHm, uCl; uniform vec2 uHN; uniform vec4 uDom; uniform vec3 uL;
 uniform vec4 uNodes[10]; uniform vec4 uTrees[48]; uniform vec4 uRocks[6];
 uniform vec3 uTent, uSign, uFlag, uDoor; uniform float uSignRot; uniform vec2 uDoorUV;
+uniform vec4 uHouse;  // 오른쪽 들판의 외딴집: 바닥 중심 xyz · 돌린 각도(하루만)
 uniform vec4 uDw, uDw2;  // 난쟁이: 발 위치 xyz · 바라보는 방향 / 크기 · 찌그러짐 · 켜짐 · 뜬 높이
 uniform vec4 uDw3;  // 모자 씀 · 트램펄린을 발밑에(3선) · 트램펄린 위로 튄 높이 · 트램펄린 없음(그 주에 잃음)
 uniform vec4 uHats[6];  // 그 주에 잃은 모자들: 놓인 자리 xyz · 돌린 각도. 없으면 y=-500
@@ -419,33 +420,49 @@ vec2 brokenTramp(vec3 p){vec3 q=rotY((p-uBroken.xyz)/uDw2.x,uBroken.w);float b=l
   float leg=min(sdCap(t,vec3(.62,-.05,.62),vec3(.95,-.25,.35),.05),sdCap(t,vec3(-.66,-.05,-.6),vec3(-.62,.35,-.95),.05));
   float d=rim,id=28.;if(mat<d){d=mat;id=29.;}if(leg<d){d=leg;id=30.;}
   return vec2(d*uDw2.x,id);}
+/* 하루 나무 한 그루의 거리(나무 좌표 v, 1단위=s). 반환: x 거리, y 1=잎 0=줄기·가지.
+   물체 걷기·법선·색칠이 모두 이 함수를 쓴다. 경계 구 안(bb<.5)에서만 불린다. */
+// 층층 침엽수: 세 단의 깎인 원뿔 + 가지 끝 톱니(사진 6의 길가 숲 벽)
+vec2 coniferT(vec3 v){float r=length(v.xz);
+  float jag=.07*sin(atan(v.z,v.x)*9.+v.y*2.3)*min(r,1.);
+  float t1=max((r-1.05-jag+(v.y-2.2)*.55)*.75,abs(v.y-2.2)-1.25);
+  float t2=max((r-.82-jag+(v.y-3.65)*.55)*.75,abs(v.y-3.65)-1.05);
+  float t3=max((r-.52-jag*.7+(v.y-4.95)*.62)*.75,abs(v.y-4.95)-.85);
+  float f=min(min(t1,t2),t3),wood=max(r-.15+v.y*.03,abs(v.y-.65)-.65);
+  return vec2(min(f,wood),wood<f?0.:1.);}
+// 활엽수(사진 7·민의 들판 나무): 잎 뭉치 여섯 개를 부드럽게 잇고, 나무마다 돌려 같은 모양이 반복되지 않게 한다.
+// 잎 덩어리 요철은 표면 가까이(c<.4)에서만 더하고 그 기울기만큼 보폭을 줄인다. 바깥은 요철 높이만큼 덜 가게 해 넘치지 않는다.
+// 줄기는 위로 가늘어지고, 수관 아래로 가지 셋이 갈라진다.
+vec2 leafyT(vec3 v,float fi){vec3 w=rotY(v,fi*2.39);
+  float c=sdEll(w-vec3(0.,3.35,0.),vec3(1.5,1.1,1.4));
+  c=smin(c,sdEll(w-vec3(-1.05,3.,.35),vec3(.95,.8,.9)),.35);
+  c=smin(c,sdEll(w-vec3(1.,3.15,-.3),vec3(1.,.85,.95)),.35);
+  c=smin(c,sdEll(w-vec3(.15,4.2,.2),vec3(1.05,.85,1.)),.35);
+  c=smin(c,sdEll(w-vec3(-.45,3.85,-.85),vec3(.85,.72,.8)),.3);
+  c=smin(c,sdEll(w-vec3(.5,2.75,.95),vec3(.8,.6,.75)),.3);
+  if(c<.4)c=(c+.085*(sin(w.x*5.3+w.y*2.1)*sin(w.z*4.9-w.y*2.7)+.55*sin(w.y*6.1+w.x*3.3+w.z*2.3))+.035*sin(w.x*11.3+w.z*9.7+w.y*5.))*.5;  // 큰 덩어리 + 잔 잎뭉치
+  else c-=.14;
+  float wood=max(length(w.xz-vec2(.03*w.y,0.))-(.19-.03*w.y),abs(w.y-1.2)-1.2);
+  wood=min(wood,min(sdCap(w,vec3(0.,1.85,0.),vec3(-.8,2.9,.3),.075),sdCap(w,vec3(.02,1.75,0.),vec3(.75,2.95,-.25),.07)));
+  wood=min(wood,sdCap(w,vec3(0.,2.2,0.),vec3(.1,3.3,.6),.06));
+  return vec2(min(c,wood),wood<c?0.:1.);}
+vec2 dayTreeD(vec3 p,vec4 a,float fi){float s=a.w/1.45;vec3 v=(p-a.xyz)/s+vec3(0.,2.35,0.);vec2 r=fi<CONIF?coniferT(v):leafyT(v,fi);return vec2(r.x*s,r.y);}
+// 색칠 단계에서만: 맞은 점에 가장 가까운 한 그루를 고르고(gTA·gTI) 그 나무 모양의 기울기로 법선을 잰다
+vec4 gTA;float gTI;
+void pickDayTree(vec3 p){float bd=1e5;for(int i=0;i<${M.treeCount};i++){vec4 a=uTrees[i*3];float d=dayTreeD(p,a,float(i)).x;if(d<bd){bd=d;gTA=a;gTI=float(i);}}}
+vec3 dayTreeN(vec3 p){vec2 e=vec2(.006,-.006);return normalize(e.xyy*dayTreeD(p+e.xyy,gTA,gTI).x+e.yyx*dayTreeD(p+e.yyx,gTA,gTI).x+e.yxy*dayTreeD(p+e.yxy,gTA,gTI).x+e.xxx*dayTreeD(p+e.xxx,gTA,gTI).x);}
 vec2 obj(vec3 p,float foliage){
   float d=1e5,id=0.;
   for(int i=0;i<10;i++){vec3 q=p-uNodes[i].xyz;float b=length(q)-3.;float dd=b>.4?b:sdNode(q);if(uDay>.5&&b<.4)dd=min(sdBox(q-vec3(0.,.7,0.),vec3(.09,.9,.09)),sdBox(q-vec3(0.,1.7,0.),vec3(.8,.32,.12)));if(dd<d){d=dd;id=10.+float(i);}}
   if(foliage>.5){for(int i=0;i<${M.treeCount};i++){vec4 a=uTrees[i*3];float s=a.w/1.45;vec3 q=p-a.xyz+vec3(0.,2.35*s,0.);
     float bb=length(q-vec3(0.,(2.85+.35*uDay)*s,0.))-(3.2+.3*uDay)*s;float dd=bb;
-    // 두 capped cone의 보수적 거리. 줄기와 수관은 같은 모양을 유지하고 모서리 거리 계산을 줄인다.
-    if(bb<.5){vec3 v=q/s;float r=length(v.xz);
-      float low=max((r-.765+(v.y-2.35)*.415152)*.9236,abs(v.y-2.35)-1.65);
-      float high=max((r-.535+(v.y-4.35)*.381481)*.9343,abs(v.y-4.35)-1.35);
-      dd=min(min(low,high),sdBox(v-vec3(0.,.55,0.),vec3(.10,.55,.10)))*s;
-      if(uDay>.5&&float(i)<CONIF){
-        // 층층 침엽수: 세 단의 깎인 원뿔이 위로 갈수록 좁아진다(사진 6의 길가 숲 벽).
-        // 가지 끝 톱니(각도 사인)로 매끈한 원뿔 대신 잎가지 테두리처럼 보이게 한다.
-        float jag=.07*sin(atan(v.z,v.x)*9.+v.y*2.3)*min(r,1.);
-        float t1=max((r-1.05-jag+(v.y-2.2)*.55)*.75,abs(v.y-2.2)-1.25);
-        float t2=max((r-.82-jag+(v.y-3.65)*.55)*.75,abs(v.y-3.65)-1.05);
-        float t3=max((r-.52-jag*.7+(v.y-4.95)*.62)*.75,abs(v.y-4.95)-.85);
-        dd=min(min(t1,t2),min(t3,max(r-.15+v.y*.03,abs(v.y-.65)-.65)))*s;
-      } else if(uDay>.5){
-        // Three unequal crowns form an open woodland canopy; static scallops
-        // keep the silhouette leafy without adding objects or shadow rays.
-        float crown=min(sdEll(v-vec3(-.65,3.15,.15),vec3(1.65,1.25,1.5)),min(sdEll(v-vec3(.65,4.05,.1),vec3(1.45,1.25,1.3)),sdEll(v-vec3(.7,2.95,-.6),vec3(1.2,1.1,1.35))));
-        // Broad irregular masses, with a low understorey closing the verge.
-        crown+=.025*(sin(v.x*17.+v.z*13.)*sin(v.y*19.-v.z*9.));
-        // 덤불 없이 줄기를 드러낸다(사진 7의 햇살 드는 활엽수).
-        dd=min(crown,max(r-.15+v.y*.02,abs(v.y-1.25)-1.25))*s;
-      }}
+    // 하루는 위의 나무 함수, 주간은 두 capped cone의 보수적 거리(멀리서 보는 작은 나무)
+    if(bb<.5){vec3 v=q/s;
+      if(uDay>.5)dd=(float(i)<CONIF?coniferT(v).x:leafyT(v,float(i)).x)*s;
+      else{float r=length(v.xz);
+        float low=max((r-.765+(v.y-2.35)*.415152)*.9236,abs(v.y-2.35)-1.65);
+        float high=max((r-.535+(v.y-4.35)*.381481)*.9343,abs(v.y-4.35)-1.35);
+        dd=min(min(low,high),sdBox(v-vec3(0.,.55,0.),vec3(.10,.55,.10)))*s;}}
     if(dd<d){d=dd;id=2.;}}}
   for(int i=0;i<${ROCKS.length};i++){vec4 a=uRocks[i];vec3 q=rotY(p-a.xyz,.37+float(i)*.71);float bb=length(q)-2.;
     float dd=bb>.3?bb:sdBox(q,vec3(1.35,.85,1.05))-.16;if(dd<d){d=dd;id=1.;}}
@@ -469,31 +486,6 @@ vec2 obj(vec3 p,float foliage){
 }
 float objNormalDistance(vec3 p){return obj(p,${sceneMode==='day'?'0.':'1.'}).x;}
 vec3 objN(vec3 p){vec2 e=vec2(.004,-.004);return normalize(e.xyy*objNormalDistance(p+e.xyy)+e.yyx*objNormalDistance(p+e.yyx)+e.yxy*objNormalDistance(p+e.yxy)+e.xxx*objNormalDistance(p+e.xxx));}
-vec3 canopyN(vec3 p){
-  float best=1e5;vec3 n=vec3(0.,1.,0.);
-  for(int i=0;i<${M.treeCount};i++){
-    vec4 a=uTrees[i*3];float s=a.w/1.45;vec3 v=(p-a.xyz)/s+vec3(0.,2.35,0.);
-    if(float(i)<CONIF){
-      // 침엽수: 가장 가까운 단의 원뿔 옆면 법선(바깥 + 위쪽 기울기)
-      float r=max(length(v.xz),.001);
-      float cy=v.y<2.95?2.2:v.y<4.3?3.65:4.95, rb=v.y<2.95?1.05:v.y<4.3?.82:.52, k=v.y<4.3?.55:.62;
-      float d=abs(r-(rb-(v.y-cy)*k))*s;
-      if(d<best){best=d;n=vec3(v.x/r,k,v.z/r);}
-      if(v.y<1.3&&r<.2){best=0.;n=vec3(v.x,0.,v.z);}
-      continue;
-    }
-    for(int j=0;j<3;j++){
-      vec3 c,r;
-      if(j==0){c=vec3(-.65,3.15,.15);r=vec3(1.65,1.25,1.5);}
-      else if(j==1){c=vec3(.65,4.05,.1);r=vec3(1.45,1.25,1.3);}
-      else{c=vec3(.7,2.95,-.6);r=vec3(1.2,1.1,1.35);}
-      vec3 q=v-c;float d=abs(length(q/r)-1.)*s;
-      if(d<best){best=d;n=q/(r*r);}
-    }
-    if(v.y<2.5&&length(v.xz)<.19){best=0.;n=vec3(v.x,0.,v.z);}
-  }
-  return normalize(n);
-}
 float shadow(vec3 p,float withDw){
   float res=1.,t=.25;
   // Day hills have a maximum slope below .06; the high sun cannot be occluded by them.
@@ -567,6 +559,7 @@ vec3 shadeGround(vec3 p,vec3 rd,float t){
   for(int i=0;i<${M.treeCount*3};i+=3){vec4 tr=uTrees[i];float d=length(p.xz-tr.xz);ao*=mix(.5,1.,smoothstep(tr.w*.4,tr.w*1.9,d));}
   ao*=mix(.55,1.,smoothstep(-6.,0.,s+2.));
   for(int i=0;i<6;i++){if(uHats[i].y>-100.)ao*=mix(.6,1.,smoothstep(.3,1.5,length(p.xz-uHats[i].xz-vec2(.15*uDw2.x,.1*uDw2.x))));}
+  if(uDay>.5)ao*=mix(.55,1.,smoothstep(2.6,4.6,length(rotY(p-uHouse.xyz,uHouse.w).xz/vec2(1.,1.25))));  // 외딴집 접지 그늘
   if(uBroken.y>-100.)ao*=mix(.55,1.,smoothstep(.6,2.2,length(p.xz-uBroken.xz)/uDw2.x));
   if(uDw2.z>.5){float dd=length(p.xz-uDw.xz)/uDw2.x;ao*=mix(mix(.42,.9,clamp(uDw2.w*.7,0.,1.)),1.,smoothstep(.35,1.3,dd));}
   float dif=max(dot(n,uL),0.)*shadow(p+n*.08,1.);
@@ -599,7 +592,9 @@ vec3 shadeCloud(vec3 p,vec3 rd,float t){
 vec3 shadeObj(vec3 p,vec3 rd,float id,float t){
   // Canopy normals do not need four complete scene SDF evaluations. The boy,
   // his cap and trampoline retain their original precise tetrahedral normal.
-  vec3 n=uDay>.5&&id>1.5&&id<2.5?canopyN(p):objN(p);
+  vec3 n;
+  if(uDay>.5&&id>1.5&&id<2.5){pickDayTree(p);n=dayTreeN(p);}else n=objN(p);
+  float leafGlow=0.,boy=0.,skin=0.;
   float sh=shadow(p+n*.06,0.);
   float dif=max(dot(n,uL),0.)*sh;
   vec3 alb=vec3(.5);float spec=0.,gloss=8.,emi=0.;
@@ -607,23 +602,28 @@ vec3 shadeObj(vec3 p,vec3 rd,float id,float t){
   if(id>=19.5){
     vec3 q0=dwLocal(p),q=q0-vec3(0.,uDw3.y*.42+uDw3.z,0.);
     // 20 블레이저 / 21 캡 / 22 피부 / 23 셔츠·나비넥타이 / 24 머리·조끼.
+    boy=id<27.5?1.:0.;
     if(id<20.5){alb=lin(vec3(.34,.63,.79));
       if(q.z>.23&&q.y>1.4)alb=lin(vec3(.43,.71,.85));
-      alb*=.94+.06*smoothstep(.9,1.8,q.y);spec=.08;gloss=12.;}
+      alb*=.94+.06*smoothstep(.9,1.8,q.y);spec=.08;gloss=12.;
+      alb*=.9+.12*vn(vec2(q.x*11.+q.z*7.,q.y*5.));}  // 천 주름이 만드는 옅은 얼룩
     else if(id<21.5){alb=lin(vec3(.29,.53,.68));vec3 h=q;
       for(int i=0;i<6;i++){vec4 hat=uHats[i];if(hat.y>-100.&&length(p-hat.xyz)<1.2*uDw2.x){
         h=rotY((p-hat.xyz)/uDw2.x,hat.w);h=vec3(.94*h.x-.342*h.y,.342*h.x+.94*h.y+2.985,h.z);}}
       float band=smoothstep(.012,.025,abs(h.y-2.86));alb*=mix(.7,1.,band);
       float seam=abs(h.x+.035+(h.y-3.025)*.12);alb*=mix(.86,1.,smoothstep(.008,.02,seam));
       spec=.08;gloss=12.;}
-    else if(id<22.5){alb=lin(vec3(.99,.77,.59));
+    else if(id<22.5){alb=lin(vec3(.99,.77,.59));skin=1.;
       if(q.z>.34){float cheek=length((vec2(abs(q.x)-.34,q.y-2.29))/vec2(.15,.1));
         alb=mix(alb,lin(vec3(.98,.58,.44)),(1.-smoothstep(.2,1.,cheek))*.28);
+        float brow=abs(q.y-(2.69-1.6*(abs(q.x)-.21)*(abs(q.x)-.21)));  // 눈썹: 눈 위 가는 갈색 호
+        if(brow<.02&&abs(abs(q.x)-.21)<.11)alb=lin(vec3(.36,.22,.11));
         float smile=abs(q.y-(2.185+.48*q.x*q.x));
         if(abs(q.x)<.13&&smile<.012)alb=lin(vec3(.40,.21,.14));}}
     else if(id<23.5){alb=lin(vec3(.99,.97,.90));
       if(q.y>1.67&&q.y<1.84&&q.z>.315){alb=lin(vec3(.77,.16,.12));spec=.12;}}
-    else if(id<24.5){alb=q.y>2.?lin(vec3(.40,.25,.12)):lin(vec3(.42,.26,.17));spec=.05;}
+    else if(id<24.5){alb=q.y>2.?lin(vec3(.40,.25,.12)):lin(vec3(.42,.26,.17));spec=.05;
+      if(q.y>2.){alb*=.72+.5*vn(vec2(atan(q.z,q.x)*8.,q.y*16.));spec=.25;gloss=30.;}}  // 머리카락 결과 윤기
     else if(id>27.5){vec3 t=rotY((p-uBroken.xyz)/uDw2.x,uBroken.w);float r=length(t.xz);
       if(id<28.5){alb=lin(vec3(.20,.78,.95))*.8;spec=.6;gloss=60.;}  // 끊긴 테: 원래 하늘색, 조금 바랬다
       else if(id<29.5){alb=mix(lin(vec3(.10,.17,.42)),lin(vec3(.23,.35,.66)),smoothstep(.9,.1,r)*.5)*.85;spec=.1;gloss=20.;}
@@ -660,14 +660,31 @@ vec3 shadeObj(vec3 p,vec3 rd,float id,float t){
   } else if(id<2.5){
     float v=vn(p.xz*1.7+p.y*1.3)*.6+vn(p.xz*4.3-p.y*3.1)*.4;
     alb=mix(TREE_DARK,TREE,v*.7+smoothstep(-.2,.9,n.y)*.35);
-    if(uDay>.5)alb=mix(vec3(.025,.085,.018),vec3(.16,.29,.045),v*.55+max(n.y,0.)*.35);
-    if(uDay>.5){float cn=0.,bark=0.,ty=0.;for(int i=0;i<${M.treeCount};i++){vec4 a=uTrees[i*3];float s=a.w/1.45;vec3 v=(p-a.xyz)/s+vec3(0.,2.35,0.);float r=length(v.xz);
-        bool c=float(i)<CONIF;if(c&&r<1.9){cn=1.;ty=v.y;}
-        if(r<(c?.2:.19)&&v.y<(c?1.3:2.5))bark=1.;}
-      // 침엽수는 푸른빛 도는 짙은 녹색, 윗단 치마 바로 밑은 그늘이 져서 층이 읽힌다.
-      float tf=ty<2.6?(ty-.95)/1.65:ty<4.1?(ty-2.6)/1.5:0.;
-      alb=mix(alb,mix(vec3(.012,.05,.03),vec3(.06,.16,.08),v*.6+max(n.y,0.)*.3)*(1.-.6*smoothstep(.5,1.,tf)),cn);
-      alb=mix(alb,mix(vec3(.09,.05,.025),vec3(.22,.14,.07),v),bark);}  // 줄기는 나무껍질 갈색
+    if(uDay>.5){
+      float s=gTA.w/1.45;vec3 tv=(p-gTA.xyz)/s+vec3(0.,2.35,0.);bool con=gTI<CONIF;
+      vec2 part=con?coniferT(tv):leafyT(tv,gTI);
+      if(part.y<.5){  // 줄기·가지: 세로 결이 있는 나무껍질
+        vec3 w=con?tv:rotY(tv,gTI*2.39);float an=atan(w.z,w.x);
+        alb=mix(vec3(.07,.04,.02),vec3(.24,.15,.075),vn(vec2(an*2.5,w.y*7.))*.7+vn(vec2(an*9.,w.y*2.))*.3);
+      }else if(con){
+        // 침엽수: 층마다 아래 끝은 밝은 새순, 윗단 치마 밑은 그늘, 세로 바늘잎 결
+        float ty=tv.y,tf=ty<2.6?(ty-.95)/1.65:ty<4.1?(ty-2.6)/1.5:(ty-4.1)/1.7;
+        n=normalize(vec3(n.x,max(n.y,-.15)+.3,n.z));  // 층 아랫면도 하늘빛을 받게(검은 띠 방지)
+        float an=atan(tv.z,tv.x),needle=vn(vec2(an*14.,ty*9.)),rows=.5+.5*sin(ty*22.+an*3.);  // 세로 바늘잎 결 + 층 안의 가지 줄
+        alb=mix(vec3(.010,.045,.026),vec3(.07,.17,.085),v*.4+needle*.35+max(n.y,0.)*.3)*(1.-.6*smoothstep(.5,1.,tf))*(.7+.45*needle)*(.82+.28*rows);
+        alb=mix(alb,vec3(.13,.24,.07),(1.-smoothstep(0.,.18,tf))*.55);
+      }else{
+        // 활엽수: 잎 뭉치마다 밝기가 다르고, 뭉치 사이 골과 수관 안쪽은 그늘. 해를 등진 잎은 비쳐 빛난다(leafGlow)
+        vec3 w=rotY(tv,gTI*2.39);
+        float clump=h12(floor(w.xz*1.6+vec2(w.y*1.2,-w.y*.8)+gTI*7.));
+        float inner=smoothstep(.9,2.1,length((w-vec3(0.,3.45,0.))*vec3(1.,1.25,1.)));
+        alb=mix(vec3(.020,.065,.014),vec3(.17,.31,.05),clamp(.2+.45*clump+.3*v+max(n.y,0.)*.25,0.,1.))*(.45+.55*inner);
+        // 잎 결: 큰 잎 뭉치 + 잔잎 두 겹. 깊은 틈은 어둡게, 잎마다 빛 받는 방향을 조금씩 틀어 반짝이게(모양 비용 없음)
+        float f1=vn(w.xz*6.5+vec2(w.y*4.1,-w.y*3.3)),f2=vn(w.xz*15.+vec2(w.y*11.,w.y*7.)),leaves=f1*.65+f2*.35;
+        alb*=.6+.7*leaves;alb=mix(alb*.3,alb,smoothstep(.2,.42,leaves));
+        n=normalize(n+(vec3(f1,f2,f1*f2)-.5)*.6);
+        leafGlow=inner*smoothstep(.3,.6,leaves);
+      }}
     n=normalize(n+vec3(v-.5)*.16);dif=max(dot(n,uL),0.)*sh;spec=.015;gloss=6.;
   } else if(id<3.5){alb=lin(vec3(.48,.34,.22));
   } else if(id<4.5){vec3 q=p-uTent;float an=atan(q.z,q.x);alb=mix(lin(vec3(.93,.25,.18)),lin(vec3(.98,.95,.88)),step(.5,fract(an/6.2832*8.)));if(q.y<-3.25)alb*=.6;
@@ -677,12 +694,38 @@ vec3 shadeObj(vec3 p,vec3 rd,float id,float t){
   } else if(id<7.5){alb=lin(vec3(.95,.95,.95));spec=.4;gloss=30.;
   } else if(id<8.5){vec3 q=p-uFlag;alb=vec3(.880,.190,.045);spec=.3;
   } else {alb=lin(vec3(.98,.98,.97));emi=id>9.25?.9:.3;}
+  if(skin>.5)dif=max((dot(n,uL)+.45)/1.45,0.)*mix(.55,1.,sh);  // 피부는 빛이 부드럽게 감싼다
   vec3 col=alb*(SUN*dif+AMB*(.6+.4*n.y));
   col+=SUN*spec*pow(max(dot(normalize(uL-rd),n),0.),gloss)*sh*(gloss>50.?1.2:.3);
   col+=spec*sky(ref)*(.08+.9*fre)*(gloss>50.?1.:.3);
   col+=alb*emi*vec3(1.,.97,.9);
+  if(uDay>.5){
+    // 해를 등진 잎은 햇빛이 비쳐 연둣빛으로 빛난다(수관 바깥쪽만)
+    col+=vec3(.16,.26,.03)*leafGlow*pow(max(dot(rd,uL),0.),2.)*(.4+.6*sh);
+    // 소년: 그늘진 피부의 따뜻한 혈색, 그리고 몸 가장자리 윤곽 빛으로 배경에서 또렷이 뜬다
+    col+=alb*vec3(.30,.09,.05)*skin*(1.-dif);
+    col+=vec3(.95,.93,1.)*.45*boy*pow(1.-max(dot(n,-rd),0.),3.)*(.35+.65*clamp(dot(n,uL)+.4,0.,1.));
+  }
   return col;
 }
+/* 붉은 지붕 외딴집. 물체 묶음(obj)·그림자에는 넣지 않고 main에서 경계 구에 닿는 광선만 따로 걷는다.
+   그래서 집 근처가 아닌 픽셀의 비용은 구-광선 판정 한 번뿐이다. 창문·문은 모양 대신 색으로 칠한다. */
+float houseD(vec3 p){vec3 q=rotY(p-uHouse.xyz,uHouse.w);
+  float walls=sdBox(q-vec3(0.,1.3,0.),vec3(2.3,1.3,1.5));
+  float qy=q.y-2.6,roof=max(abs(q.x)-2.55,max((abs(q.z)*1.5+qy*1.85-2.775)*.4196,-qy));
+  float chim=max(sdBox(q-vec3(1.25,3.9,-.55),vec3(.2,.6,.2)),-qy);
+  return min(min(walls,roof),chim);}
+vec3 shadeHouse(vec3 p,vec3 rd){
+  vec2 e=vec2(.01,-.01);vec3 n=normalize(e.xyy*houseD(p+e.xyy)+e.yyx*houseD(p+e.yyx)+e.yxy*houseD(p+e.yxy)+e.xxx*houseD(p+e.xxx));
+  vec3 q=rotY(p-uHouse.xyz,uHouse.w),alb=lin(vec3(.95,.94,.90));
+  if(q.y>2.62||(q.y>2.45&&abs(q.z)>1.52))alb=lin(vec3(.80,.10,.07));        // 붉은 지붕(처마 포함)
+  if(abs(q.x-1.25)<.21&&abs(q.z+.55)<.21&&q.y>3.)alb=lin(vec3(.86,.85,.82));  // 굴뚝
+  float win=0.;
+  if(q.z>1.45&&q.y<2.6)win=max(step(abs(abs(q.x)-1.35),.32)*step(abs(q.y-1.55),.3),step(abs(q.x),.3)*step(q.y,1.55));  // 앞면: 창 둘 · 문
+  if(abs(q.x)>2.25&&q.z<1.4&&q.y<2.6)win=step(abs(q.z),.32)*step(abs(q.y-1.55),.3);                                  // 옆면: 창 하나
+  alb=mix(alb,lin(vec3(.30,.42,.58)),win);
+  float dif=max(dot(n,uL),0.);
+  return alb*(SUN*dif+AMB*(.6+.4*n.y));}
 void main(){
   vec2 uv=(2.*gl_FragCoord.xy-uRes)/uRes.y;
   vec3 rd=normalize(uv.x*uCu+uv.y*uCv+uFl*uCw);
@@ -715,8 +758,15 @@ void main(){
   float oid=0.,ot=-1.;
   if(tf>max(tn,0.)){float tt=max(tn,.5);float lim=hit>0.?min(tf,hit):tf;
     for(int i=0;i<160;i++){vec2 o=obj(ro+rd*tt,1.);if(o.x<(o.y>19.5?.0004:.0015)*tt){ot=tt;oid=o.y;break;}tt+=o.x*.9;if(tt>lim)break;}}
+  // 외딴집: 경계 구(반지름 3.8)와 만나는 광선만 집 모양으로 짧게 걷는다
+  float ht=-1.;
+  if(uDay>.5){vec3 oc=ro-uHouse.xyz-vec3(0.,2.1,0.);float b=dot(oc,rd),hh=b*b-dot(oc,oc)+14.44;
+    if(hh>0.){float t=max(-b-sqrt(hh),.5),te=-b+sqrt(hh);
+      for(int i=0;i<40;i++){float d=houseD(ro+rd*t);if(d<.0015*t){ht=t;break;}t+=d;if(t>te)break;}
+      if(ht>0.&&((ot>0.&&ot<ht)||(hit>0.&&hit<ht)))ht=-1.;}}
   vec3 col;
-  if(ot>0.){col=shadeObj(ro+rd*ot,rd,oid,ot);col=fogit(col,ot,rd);}
+  if(ht>0.){col=fogit(shadeHouse(ro+rd*ht,rd),ht,rd);}
+  else if(ot>0.){col=shadeObj(ro+rd*ot,rd,oid,ot);col=fogit(col,ot,rd);}
   else if(hit>0.){vec3 p=ro+rd*hit;col=kind<1.5?fogit(shadeGround(p,rd,hit),hit,rd):mix(fogit(shadeCloud(p,rd,hit),hit,rd),sky(rd),smoothstep(260.,650.,hit));}
   else if(rd.y<0.){float tt=(CY+2.-ro.y)/rd.y;col=mix(fogit(shadeCloud(ro+rd*tt,rd,tt),tt,rd),sky(rd),smoothstep(260.,650.,tt));}
   else col=sky(rd);
@@ -777,7 +827,7 @@ function useMapProgram(n){
       if(!gl.getShaderParameter(sh,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(sh));gl.attachShader(next,sh);
     }
     gl.linkProgram(next);if(!gl.getProgramParameter(next,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(next));
-    const uniforms={};for(const name of ['uDay','uRes','uRo','uCu','uCv','uCw','uFl','uHm','uCl','uHN','uDom','uL','uNodes','uTrees','uRocks','uTent','uSign','uFlag','uDoor','uSignRot','uDoorUV','uDw','uDw2','uDw3','uHats','uBroken','uPath','uPathOn'])uniforms[name]=gl.getUniformLocation(next,name);
+    const uniforms={};for(const name of ['uDay','uRes','uRo','uCu','uCv','uCw','uFl','uHm','uCl','uHN','uDom','uL','uNodes','uTrees','uRocks','uTent','uSign','uFlag','uDoor','uSignRot','uDoorUV','uHouse','uDw','uDw2','uDw3','uHats','uBroken','uPath','uPathOn'])uniforms[name]=gl.getUniformLocation(next,name);
     const loc=gl.getAttribLocation(next,'a'),old=prog;
     gl.useProgram(next);gl.bindBuffer(gl.ARRAY_BUFFER,vertexBuffer);gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
     prog=next;U=uniforms;compiledMap=n;compiledScene=sceneMode;bindScenery();
@@ -802,6 +852,7 @@ function bindScenery(){
   gl.uniform4fv(U.uTrees,new Float32Array(tr.slice(0,(sceneMode==='day'?MAP_SCENES.dayTrees.length:MAPS[compiledMap-1].treeCount)*12)));
   const rocks=[];ROCKS.forEach(([x,z])=>rocks.push(x,groundY(x,z)+.45,z,1));gl.uniform4fv(U.uRocks,new Float32Array(rocks));
   gl.uniform3f(U.uTent,TENT[0],groundY(TENT[0],TENT[1])+3.35,TENT[1]);
+  if(sceneMode==="day"){const [hx,hz,hy]=MAP_SCENES.house;gl.uniform4f(U.uHouse,hx,groundY(hx,hz)-.05,hz,hy);}
   gl.uniform3f(U.uSign,SIGN[0],sceneMode==='day'?-200:groundY(SIGN[0],SIGN[1])-.05,SIGN[1]);
   gl.uniform3f(U.uFlag,FLAG[0],groundY(FLAG[0],FLAG[1])-.1,FLAG[1]);
   if(sceneMode==="day")gl.uniform3f(U.uDoor,0,-500,0);  // 하루 장면의 문은 하늘에 그린다(doorSpot)
