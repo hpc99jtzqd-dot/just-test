@@ -425,17 +425,17 @@ vec2 brokenTramp(vec3 p){vec3 q=rotY((p-uBroken.xyz)/uDw2.x,uBroken.w);float b=l
    물체 걷기·법선·색칠이 모두 이 함수를 쓴다. 경계 구 안(bb<.5)에서만 불린다. */
 // 침엽수(젤다 BotW풍): 가늘고 키 큰 줄기에 처진 가지 층 6단. 층은 가장자리로 갈수록 아래로 처지고 테두리에 가지 술이 난다.
 // 층 6개를 다 재지 않고 높이로 가까운 층 셋만 식으로 고른다(반복문 없음). 처짐 기울기만큼 보폭을 줄인다.
-float pineTier(vec3 v,float k,float an){float h=1.6+.7*k,R=1.35-.19*k,r=length(v.xz);
-  float rr=R+.12*sin(an*7.+k*1.7)*min(r,1.);           // 가지 술
+float pineTier(vec3 v,float k,float tas){float h=1.6+.7*k,R=1.35-.19*k,r=length(v.xz);
+  float rr=R+tas;                                       // 가지 술(가장 가까운 층만 계산해 넘긴다)
   float dy=v.y-(h-.55*r*r/R);                           // 가장자리로 갈수록 처진다
   return max(r-rr,abs(dy)-(.28*(1.-r/rr)+.07))*.6;}
 vec2 coniferT(vec3 v){float an=atan(v.z,v.x),k=clamp(floor((v.y-1.6)/.7+.5),0.,5.);
-  float f=min(pineTier(v,k,an),min(pineTier(v,max(k-1.,0.),an),pineTier(v,min(k+1.,5.),an)));
+  float f=min(pineTier(v,k,.12*sin(an*7.+k*1.7)*min(length(v.xz),1.)),min(pineTier(v,max(k-1.,0.),.06),pineTier(v,min(k+1.,5.),.06)));
   f=min(f,max((length(v.xz)-.32+(v.y-5.7)*.32)*.95,abs(v.y-5.85)-.45));   // 꼭대기 끝
   float wood=max(length(v.xz)-(.14-.012*v.y),abs(v.y-2.9)-2.9);
   return vec2(min(f,wood),wood<f?0.:1.);}
 // 활엽수(젤다 BotW풍): 아래가 굵고 살짝 휜 줄기가 네 갈래 가지로 갈라지고, 가지 끝마다 따로 떨어진 잎 뭉치가 달린다.
-// 뭉치 사이로 하늘이 보인다. 잎 요철은 낮은 주파수로 표면 근처에서만(보폭 .75배). 나무마다 돌려 같은 모양이 반복되지 않게.
+// 뭉치 사이로 하늘이 보인다. 잎 덩어리는 매끈하게 두고(요철은 걷기 비용이 커서 뺐다) 색으로만 결을 낸다. 나무마다 돌려 같은 모양이 반복되지 않게.
 vec2 leafyT(vec3 v,float fi){vec3 w=rotY(v,fi*2.39);
   vec2 bend=vec2(.12*sin(w.y*1.1+fi),.08*cos(w.y*.9+fi*1.7));
   float wood=max(length(w.xz-bend)-(.27-.06*w.y),abs(w.y-1.15)-1.15);
@@ -449,26 +449,37 @@ vec2 leafyT(vec3 v,float fi){vec3 w=rotY(v,fi*2.39);
   c=smin(c,sdEll(w-vec3(.15,4.45,.25),vec3(1.05,.8,1.)),.18);
   c=smin(c,sdEll(w-vec3(.4,3.15,1.15),vec3(.8,.62,.75)),.18);
   c=smin(c,sdEll(w-vec3(-.35,3.9,-.85),vec3(.7,.55,.65)),.18);
-  if(c<.3)c=(c+.07*sin(w.x*4.3+w.y*2.7)*sin(w.z*4.1-w.y*3.3))*.75;else c-=.07;
   return vec2(min(c,wood),wood<c?0.:1.);}
-vec2 dayTreeD(vec3 p,vec4 a,float fi){float s=a.w/1.45;vec3 v=(p-a.xyz)/s+vec3(0.,2.35,0.);vec2 r=fi<CONIF?coniferT(v):leafyT(v,fi);return vec2(r.x*s,r.y);}
-// 색칠 단계에서만: 맞은 점에 가장 가까운 한 그루를 고르고(gTA·gTI) 그 나무 모양의 기울기로 법선을 잰다
+float conD(vec3 p,vec4 a){float s=a.w/1.45;return coniferT((p-a.xyz)/s+vec3(0.,2.35,0.)).x*s;}
+float leafD(vec3 p,vec4 a,float fi){float s=a.w/1.45;return leafyT((p-a.xyz)/s+vec3(0.,2.35,0.),fi).x*s;}
+// 색칠 단계에서만: 맞은 점에 가장 가까운 한 그루를 고르고(gTA·gTI) 그 나무 모양의 기울기로 법선을 잰다.
+// 경계 구가 먼 나무는 건너뛰고, 침엽수·활엽수를 따로 돌아 두 모양을 함께 계산하지 않게 한다.
 vec4 gTA;float gTI;
-void pickDayTree(vec3 p){float bd=1e5;for(int i=0;i<${M.treeCount};i++){vec4 a=uTrees[i*3];float d=dayTreeD(p,a,float(i)).x;if(d<bd){bd=d;gTA=a;gTI=float(i);}}}
-vec3 dayTreeN(vec3 p){vec2 e=vec2(.006,-.006);return normalize(e.xyy*dayTreeD(p+e.xyy,gTA,gTI).x+e.yyx*dayTreeD(p+e.yyx,gTA,gTI).x+e.yxy*dayTreeD(p+e.yxy,gTA,gTI).x+e.xxx*dayTreeD(p+e.xxx,gTA,gTI).x);}
+float treeBound(vec3 p,vec4 a){float s=a.w/1.45;return length(p-a.xyz-vec3(0.,.85*s,0.))-3.5*s;}
+void pickDayTree(vec3 p){float bd=1e5;
+  for(int i=0;i<${sceneMode==='day'?MAP_SCENES.dayConifers:0};i++){vec4 a=uTrees[i*3];if(treeBound(p,a)>.5)continue;float d=conD(p,a);if(d<bd){bd=d;gTA=a;gTI=float(i);}}
+  for(int i=${sceneMode==='day'?MAP_SCENES.dayConifers:0};i<${M.treeCount};i++){vec4 a=uTrees[i*3];if(treeBound(p,a)>.5)continue;float d=leafD(p,a,float(i));if(d<bd){bd=d;gTA=a;gTI=float(i);}}}
+vec3 dayTreeN(vec3 p){vec2 e=vec2(.006,-.006);
+  if(gTI<CONIF)return normalize(e.xyy*conD(p+e.xyy,gTA)+e.yyx*conD(p+e.yyx,gTA)+e.yxy*conD(p+e.yxy,gTA)+e.xxx*conD(p+e.xxx,gTA));
+  return normalize(e.xyy*leafD(p+e.xyy,gTA,gTI)+e.yyx*leafD(p+e.yyx,gTA,gTI)+e.yxy*leafD(p+e.yxy,gTA,gTI)+e.xxx*leafD(p+e.xxx,gTA,gTI));}
 vec2 obj(vec3 p,float foliage){
   float d=1e5,id=0.;
   for(int i=0;i<10;i++){vec3 q=p-uNodes[i].xyz;float b=length(q)-3.;float dd=b>.4?b:sdNode(q);if(uDay>.5&&b<.4)dd=min(sdBox(q-vec3(0.,.7,0.),vec3(.09,.9,.09)),sdBox(q-vec3(0.,1.7,0.),vec3(.8,.32,.12)));if(dd<d){d=dd;id=10.+float(i);}}
-  if(foliage>.5){for(int i=0;i<${M.treeCount};i++){vec4 a=uTrees[i*3];float s=a.w/1.45;vec3 q=p-a.xyz+vec3(0.,2.35*s,0.);
-    float bb=length(q-vec3(0.,(2.85+.35*uDay)*s,0.))-(3.2+.3*uDay)*s;float dd=bb;
-    // 하루는 위의 나무 함수, 주간은 두 capped cone의 보수적 거리(멀리서 보는 작은 나무)
-    if(bb<.5){vec3 v=q/s;
-      if(uDay>.5)dd=(float(i)<CONIF?coniferT(v).x:leafyT(v,float(i)).x)*s;
-      else{float r=length(v.xz);
+  // 하루: 침엽수와 활엽수를 따로 돈다. 한 반복 안에서 '조건 ? 침엽수 : 활엽수'로 고르면 GPU가 두 모양을 다 계산하는 일이 많다.
+  // 경계도 모양에 맞춘다: 침엽수는 좁고 긴 원기둥, 활엽수는 세운 캡슐.
+  if(foliage>.5){${sceneMode==='day'?`
+    for(int i=0;i<${MAP_SCENES.dayConifers};i++){vec4 a=uTrees[i*3];float s=a.w/1.45;vec3 q=p-a.xyz+vec3(0.,2.35*s,0.);
+      float dd=max(length(q.xz)-1.6*s,abs(q.y-3.15*s)-3.25*s);if(dd<.4)dd=coniferT(q/s).x*s;if(dd<d){d=dd;id=2.;}}
+    for(int i=${MAP_SCENES.dayConifers};i<${M.treeCount};i++){vec4 a=uTrees[i*3];float s=a.w/1.45;vec3 q=p-a.xyz+vec3(0.,2.35*s,0.);
+      float dd=length(q-vec3(0.,clamp(q.y,s,3.4*s),0.))-2.65*s;if(dd<.4)dd=leafyT(q/s,float(i)).x*s;if(dd<d){d=dd;id=2.;}}`:`
+    for(int i=0;i<${M.treeCount};i++){vec4 a=uTrees[i*3];float s=a.w/1.45;vec3 q=p-a.xyz+vec3(0.,2.35*s,0.);
+      float dd=length(q-vec3(0.,2.85*s,0.))-3.2*s;
+      // 주간은 두 capped cone의 보수적 거리(멀리서 보는 작은 나무)
+      if(dd<.5){vec3 v=q/s;float r=length(v.xz);
         float low=max((r-.765+(v.y-2.35)*.415152)*.9236,abs(v.y-2.35)-1.65);
         float high=max((r-.535+(v.y-4.35)*.381481)*.9343,abs(v.y-4.35)-1.35);
-        dd=min(min(low,high),sdBox(v-vec3(0.,.55,0.),vec3(.10,.55,.10)))*s;}}
-    if(dd<d){d=dd;id=2.;}}}
+        dd=min(min(low,high),sdBox(v-vec3(0.,.55,0.),vec3(.10,.55,.10)))*s;}
+      if(dd<d){d=dd;id=2.;}}`}}
   for(int i=0;i<${ROCKS.length};i++){vec4 a=uRocks[i];vec3 q=rotY(p-a.xyz,.37+float(i)*.71);float bb=length(q)-2.;
     float dd=bb>.3?bb:uDay>.5?smin(sdEll(q-vec3(0.,-.1,0.),vec3(1.45,.85,1.1)),sdEll(q-vec3(.55,.25,.2),vec3(.8,.6,.7)),.3):sdBox(q,vec3(1.35,.85,1.05))-.16;if(dd<d){d=dd;id=1.;}}
   {vec3 q=p-uTent;float b=length(q+vec3(0.,1.7,0.))-3.;float dd=b>.3?b:sdCone(q,vec2(.5,.866),3.4);if(dd<d){d=dd;id=4.;}}
@@ -666,14 +677,15 @@ vec3 shadeObj(vec3 p,vec3 rd,float id,float t){
     alb=mix(ROCK_DARK,ROCK,vn(p.xz*.7+p.y*.8));
     alb=mix(alb,SNOW,smoothstep(SNOW_START,SNOW_END,p.y)*smoothstep(.35,.78,n.y));
     if(uDay>.5){float tone=smoothstep(.32,.72,(dot(n,uL)*.5+.5)*mix(.55,1.,sh));toon=1.;  // 하루: 둥근 회색 바위, 윗면은 이끼
-      alb=mix(vec3(.07,.075,.08),vec3(.40,.41,.40),tone);alb=mix(alb,mix(vec3(.04,.08,.02),vec3(.22,.36,.08),tone),smoothstep(.45,.85,n.y+.25*vn(p.xz*1.7)));}
+      alb=mix(vec3(.05,.05,.055),vec3(.29,.27,.23),tone)*(.85+.3*vn(p.xz*2.3+p.y*1.9));  // 따뜻한 회갈색(푸른 하늘빛에 뜨지 않게)
+      alb=mix(alb,mix(vec3(.03,.07,.02),vec3(.19,.34,.06),tone),smoothstep(.3,.7,n.y+.3*vn(p.xz*1.7)));}
   } else if(id<2.5){
     float v=vn(p.xz*1.7+p.y*1.3)*.6+vn(p.xz*4.3-p.y*3.1)*.4;
     alb=mix(TREE_DARK,TREE,v*.7+smoothstep(-.2,.9,n.y)*.35);
     if(uDay>.5){
       // BotW풍: 잔무늬 대신 큰 면의 부드러운 2단 명암. 빛은 색에 넣고 마지막 조명은 평평하게(toon)
       float s=gTA.w/1.45;vec3 tv=(p-gTA.xyz)/s+vec3(0.,2.35,0.);bool con=gTI<CONIF;
-      vec2 part=con?coniferT(tv):leafyT(tv,gTI);
+      vec2 part;if(con)part=coniferT(tv);else part=leafyT(tv,gTI);
       float tone=smoothstep(.32,.72,(dot(n,uL)*.5+.5)*mix(.55,1.,sh));toon=1.;
       if(part.y<.5){  // 줄기·가지: 갈색 나무껍질, 위를 향한 면엔 이끼
         vec3 w=con?tv:rotY(tv,gTI*2.39);
@@ -916,6 +928,22 @@ function panelBlocks(extra=[]){
   return [document.querySelector('.head'),document.getElementById('info'),VW.W>=900?nodesEl:null,...extra].filter(Boolean).map(e=>e.getBoundingClientRect())
     .filter(r=>r.width&&r.bottom>sr.top&&r.top<sr.bottom).map(r=>({l:r.left-sr.left-6,r:r.right-sr.left+6,t:r.top-sr.top-6,b:r.bottom-sr.top+6}));
 }
+// 광선이 거대한 나무(셰이더 giantD와 같은 줄기 축·가지·잎 뭉치, 조금 넉넉하게)에 닿는지. 감싼 원기둥 구간을 1단위씩 훑는다.
+function giantHit(rd){
+  const [gx,gz]=MAP_SCENES.giant,gy=groundY(gx,gz)-.3,ro=CAM.ro,ox=ro[0]-gx,oz=ro[2]-gz,a=rd[0]*rd[0]+rd[2]*rd[2],b=ox*rd[0]+oz*rd[2],h=b*b-a*(ox*ox+oz*oz-35*35);
+  if(h<=0||a<1e-6)return false;
+  const GR=6.5,ax=y=>{const k=Math.min(1,Math.max(0,y/60)),s=k*k*(3-2*k);return [7*Math.sin(y*.018)*s,6*Math.sin(y*.013+1.3)*s];};
+  for(let t=Math.max((-b-Math.sqrt(h))/a,.5),te=(-b+Math.sqrt(h))/a;t<te;t+=1){
+    const y=ro[1]+rd[1]*t-gy,[cx,cz]=ax(y),dx=ro[0]+rd[0]*t-gx-cx,dz=ro[2]+rd[2]*t-gz-cz;
+    if(y<-2||y>420)continue;
+    if(Math.hypot(dx,dz)<GR*1.5+1)return true;
+    const cell=Math.max(Math.round((y-25)/30),0),yy=y-25-cell*30,ba=cell*2.4,ex=Math.cos(ba)*(GR+10),ez=Math.sin(ba)*(GR+10);
+    if(Math.hypot((dx-ex)/9.5,(yy-10)/6,(dz-ez)/9)<1)return true;                                   // 잎 뭉치
+    const u=Math.max(0,Math.min(1,((dx-ex*.48)*(ex*.52)+yy*7+(dz-ez*.48)*(ez*.52))/((ex*.52)**2+49+(ez*.52)**2)));
+    if(Math.hypot(dx-ex*.48-ex*.52*u,yy-7*u,dz-ez*.48-ez*.52*u)<2.5)return true;                 // 굵은 가지
+  }
+  return false;
+}
 function doorSpot(){
   // 장소 표지는 render() 전에 buildOverlay()가 이미 놓았으므로 문이 표지도 피한다.
   const blocks=panelBlocks([...document.querySelectorAll('#dayMarkers button')]), fl=CAM.fl;
@@ -925,8 +953,7 @@ function doorSpot(){
     if(sx<8||sx>VW.W-8||sy<8||blocks.some(k=>sx>k.l&&sx<k.r&&sy>k.t&&sy<k.b))return null;
     const rd=v3.norm([0,1,2].map(i=>dx*fl*CAM.cu[i]+dy*fl*CAM.cv[i]+fl*CAM.cw[i]));
     if(rd[1]<.09)return null;  // 먼 숲 능선 위로
-    {const [gx,gz]=MAP_SCENES.giant,ox=gx-CAM.ro[0],oz=gz-CAM.ro[2],l=Math.hypot(rd[0],rd[2])||1,b=(ox*rd[0]+oz*rd[2])/l;
-     if(b>0&&Math.hypot(ox-rd[0]/l*b,oz-rd[2]/l*b)<16)return null;}  // 거대한 나무 줄기 뒤
+    if(giantHit(rd))return null;  // 거대한 나무 줄기·가지·잎 뭉치 뒤
     // 수관을 구 두 개(아래 넓게, 위 좁게)로 근사한다. 침엽수 맨 아랫단 1.74s, 활엽수 덩어리 1.65s보다 조금 넉넉하게.
     const hit=(c,r)=>{const o=v3.sub(c,CAM.ro),b=v3.dot(o,rd);return b>0&&v3.dot(o,o)-b*b<r*r;};
     return DAY_TREES_ON.filter(([x,y,z,s])=>hit([x,y+2.4*s,z],2.*s)||hit([x,y+4.4*s,z],1.6*s));
