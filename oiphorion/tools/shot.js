@@ -27,7 +27,7 @@ if (options.view && options.view !== 'week') throw new Error('--view must be wee
     await p.route('https://fonts.googleapis.com/**', route => route.fulfill({ contentType: 'text/css', body: '' }));
     await fake.install(p);
     await p.clock.setFixedTime(options.at ? fixedTime(options.at) : new Date());
-    await p.goto(pathToFileURL(path.resolve(__dirname, '../dist/index.html')).href, { waitUntil: 'commit', timeout: 240000 });
+    await p.goto(pathToFileURL(path.resolve(__dirname, '../dist/index.html')).href+(process.env.SHOT_QUERY||''), { waitUntil: 'commit', timeout: 240000 });
     await p.waitForFunction(() => window.__journeyReady === true && (window.__rendered >= 1 || document.querySelector('.stage.nogl')), null, { timeout: 240000 });
     if(options.fixture && !await p.evaluate(()=>JOURNEY.online))throw new Error('Fixture DB timed out; refusing an inaccurate screenshot');
     if (woke) { await p.fill('#woke', woke); await p.locator('#woke').blur(); }

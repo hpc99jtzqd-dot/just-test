@@ -221,6 +221,76 @@ function project(P){ const d=v3.sub(P,CAM.ro), z=v3.dot(d,CAM.cw); const ux=v3.d
 const VS="attribute vec2 a;void main(){gl_Position=vec4(a,0.,1.);}";
 const glslFloat=n=>{if(!Number.isFinite(n))throw new Error('Non-finite scenery constant');return Number.isInteger(n)?n+'.0':String(n);};
 const glslColor=a=>'vec3('+a.map(glslFloat).join(',')+')';
+/* 하늘의 꿈 장치: 'door'(구름 위 하얀 문) · 'temple'(올림포스풍 신전) · 'laputa'(떠 있는 섬). 주소 ?sky= 로 고른다(시안 비교용).
+   SKY_EXT: 반너비, 위, 아래(doorSpot이 가림을 잴 범위), 계단 시작, 무지개 고리 반지름, 계단 첫 칸 높이 */
+const SKY_MOTIF=(()=>{try{const v=new URLSearchParams(location.search).get('sky');return ['door','temple','laputa'].includes(v)?v:'door';}catch(e){return 'door';}})();
+const SKY_EXT={door:[.03,.06,-.065,.10,.17,-.075],temple:[.105,.08,-.08,.16,.21,-.07],laputa:[.11,.13,-.13,.13,.22,-.03]}[SKY_MOTIF];
+const SKY_GLSL={
+door:`    float frame=(1.-smoothstep(.024,.028,abs(door.x)))*(1.-smoothstep(.054,.058,abs(door.y)));
+    float cloudlet=1.-smoothstep(.85,1.05,length((door+vec2(0.,.065))/vec2(.11,.03)));
+    c=mix(c,vec3(.96,.95,1.),cloudlet*.96);
+    float rim=(1.-smoothstep(.029,.033,abs(door.x)))*(1.-smoothstep(.059,.063,abs(door.y)))*(1.-frame);
+    c=mix(c,vec3(.14,.18,.30),rim*.8);  // 옅은 남회색 윤곽: 흰 구름 앞에서도 문 모양이 읽힌다
+    c=mix(c,vec3(2.2,2.15,2.05),frame);  // 톤매핑 뒤에도 가장 흰 물체
+    float gap=(1.-smoothstep(.003,.007,door.x-.010))*step(.004,door.x)*(1.-smoothstep(.048,.052,abs(door.y)));
+    c=mix(c,vec3(2.4,1.7,.7),gap);  // 살짝 열린 문틈으로 따뜻한 빛
+    c=mix(c,vec3(.55,.68,.85),frame*(1.-smoothstep(.002,.005,abs(door.x+.012)))*(1.-smoothstep(.040,.044,abs(door.y)))*.6);  // 문판 홈`,
+// 올림포스풍 신전: 구름 위 세 단 기단, 세로 홈 기둥 여섯, 들보, 박공. 기둥 사이 신전 안쪽은 따뜻한 빛. 해는 왼쪽 위라 오른쪽 면이 라벤더 그늘.
+temple:`    vec2 q=door;
+    float cb=max(1.-smoothstep(.85,1.05,length((q+vec2(0.,.074))/vec2(.16,.03))),max(1.-smoothstep(.85,1.05,length((q+vec2(.10,.066))/vec2(.06,.024))),1.-smoothstep(.85,1.05,length((q+vec2(-.11,.068))/vec2(.065,.022)))));
+    c=mix(c,vec3(.96,.95,1.),cb*.96);
+    vec3 MW=vec3(2.,1.96,1.88),MS=vec3(.56,.58,.92),LN=vec3(.30,.32,.55);
+    float pedO=step(.041,q.y)*step(q.y,.047+.036*(1.-abs(q.x)/.102))*(1.-step(.044,q.y)*step(q.y,.044+.032*(1.-abs(q.x)/.096)));
+    c=mix(c,vec3(.20,.22,.40),pedO*step(abs(q.x),.102)*.7);                                          // 박공 윤곽
+    float cella=step(abs(q.x),.074)*step(abs(q.y+.001),.031);
+    c=mix(c,mix(vec3(1.1,.62,.22),vec3(2.2,1.55,.6),smoothstep(-.03,.03,q.y)),cella);               // 안쪽의 따뜻한 빛
+    float ci=clamp(floor((q.x+.084)/.028),0.,5.),cx=-.07+ci*.028,u=(q.x-cx)/.0085;
+    float colm=step(abs(u),1.)*step(abs(q.y+.001),.031);
+    c=mix(c,mix(MW,MS,smoothstep(-.1,.9,u))*(.88+.12*cos(u*9.4)),colm);
+    c=mix(c,LN,colm*smoothstep(.75,.95,u)*.6);                                                        // 기둥 오른쪽 가장자리                              // 기둥: 세로 홈, 오른쪽 그늘
+    float capb=max(step(abs(q.x-cx),.0125)*step(abs(q.y-.0275),.0035),step(abs(q.x-cx),.0115)*step(abs(q.y+.0295),.003));
+    c=mix(c,mix(MW,MS,step(.004,q.x-cx)*.6),capb);
+    float st=max(step(abs(q.x),.104)*step(abs(q.y+.057),.005),max(step(abs(q.x),.094)*step(abs(q.y+.047),.005),step(abs(q.x),.084)*step(abs(q.y+.037),.005)));
+    float sty=fract((q.y+.062)/.01);
+    c=mix(c,mix(MS,MW,smoothstep(.45,.6,sty))*(1.-.18*smoothstep(.04,.1,q.x)),st);                   // 기단: 단마다 윗면 밝게
+    float ent=step(abs(q.x),.088)*step(abs(q.y-.037),.007);
+    c=mix(c,mix(MW,MS,smoothstep(.0,.09,q.x)*.7),ent);
+    c=mix(c,LN,ent*step(abs(q.y-.031),.0012)*.7);                                                     // 들보 아랫선
+    c=mix(c,LN,ent*step(abs(fract(q.x/.0147+.5)-.5),.12)*step(.038,q.y)*.35);                         // 세로 장식
+    float ped=step(.044,q.y)*step(q.y,.044+.032*(1.-abs(q.x)/.096));
+    float tym=step(.0475,q.y)*step(q.y,.044+.025*(1.-abs(q.x)/.078));
+    c=mix(c,mix(MW,MS,.25+.45*step(0.,q.x)),ped);
+    c=mix(c,vec3(.86,.84,1.05),tym*.8);                                                               // 박공 안쪽 그늘
+    c=mix(c,vec3(2.3,1.9,1.1),tym*(1.-smoothstep(.003,.0045,length(q-vec2(0.,.056)))));                  // 박공 가운데 작은 해 문양`,
+// 라퓨타풍 떠 있는 섬: 아래는 층층 바위가 거꾸로 뾰족하게 매달리고, 가장자리엔 성벽과 청록 지붕 탑, 위엔 거대한 나무, 오른쪽으로 가는 폭포.
+laputa:`    vec2 q=door*1.25;
+    float tr=min(length(q-vec2(0.,.078))-.064,min(length(q-vec2(-.058,.046))-.044,min(length(q-vec2(.06,.05))-.042,min(length(q-vec2(.022,.118))-.04,length(q-vec2(-.03,.11))-.036))));
+    float trunk=step(abs(q.x),.01)*step(0.,q.y)*step(q.y,.04);
+    c=mix(c,vec3(.30,.20,.12),trunk);
+    float crown=1.-smoothstep(-.0015,.0015,tr),tone=smoothstep(-.2,.6,dot(normalize(q-vec2(0.,.07)),vec2(-.6,.8)));
+    c=mix(c,vec3(.10,.22,.16),(1.-smoothstep(-.0015,.0045,tr))*(1.-crown)*.6);                          // 수관 윤곽
+    c=mix(c,mix(vec3(.03,.13,.06),vec3(.26,.56,.12),smoothstep(.35,.6,tone))*(.9+.2*vn(q*70.)),crown);                  // 거대한 나무(툰 두 단)
+    float under=step(q.y,0.)*step(length(q/vec2(.135,.10)),1.);
+    under=max(under,step(q.y,-.08)*step(-.16,q.y)*step(abs(q.x),.03*(q.y+.16)/.08));                   // 아래로 뾰족한 바위 끝
+    float band=.5+.5*sin(q.y*240.+sin(q.x*55.)*1.6);
+    vec3 rock=mix(vec3(.16,.13,.17),vec3(.62,.50,.40),.35*band+.65*smoothstep(.06,-.10,q.x))*(.5+.5*smoothstep(-.14,0.,q.y));
+    rock=mix(rock,vec3(.20,.42,.16),step(-.012,q.y)*.8);                                              // 위 가장자리 이끼
+    float rimU=step(q.y,.002)*step(length(q/vec2(.141,.106)),1.)*(1.-under);
+    c=mix(c,vec3(.16,.17,.28),rimU*.6);
+    c=mix(c,rock,under);
+    float hh=fract(sin(floor(q.x*70.)*12.9898)*43758.5),hang=step(abs(fract(q.x*70.)-.5),.12)*step(q.y,-.004)*step(-.012-.05*hh,q.y)*step(.55,hh)*step(abs(q.x),.115);
+    c=mix(c,vec3(.10,.30,.08),hang*.9);                                                // 늘어진 뿌리·덩굴
+    float wall=step(abs(q.x),.125)*step(0.,q.y)*step(q.y,.017);
+    float win=step(abs(fract(q.x*48.)-.5),.17)*step(.004,q.y)*step(q.y,.012);
+    c=mix(c,mix(mix(vec3(1.9,1.8,1.6),vec3(.86,.82,.96),smoothstep(-.04,.12,q.x)),vec3(.20,.22,.36),win),wall);  // 성벽과 아치 창
+    float tx=abs(abs(q.x)-.104),tw=step(tx,.009)*step(0.,q.y)*step(q.y,.042);
+    float roof=step(.042,q.y)*step(q.y,.042+.026*(1.-tx/.012))*step(tx,.012);
+    c=mix(c,mix(vec3(1.9,1.8,1.6),vec3(.86,.82,.96),step(0.,q.x)*.7),tw);
+    c=mix(c,mix(vec3(.30,.66,.64),vec3(.16,.40,.44),step(0.,q.x)),roof);                               // 청록 동판 지붕
+    float wf=step(abs(q.x-.09),.004)*step(-.13,q.y)*step(q.y,0.)*smoothstep(-.13,-.02,q.y);
+    c=mix(c,vec3(1.9,1.95,2.),wf*.85);                                                                // 가장자리에서 떨어지는 가는 폭포
+    float wisp=max(1.-smoothstep(.8,1.05,length((q+vec2(.10,.012))/vec2(.07,.016))),1.-smoothstep(.8,1.05,length((q-vec2(.12,-.03))/vec2(.06,.014))));
+    c=mix(c,vec3(.97,.96,1.),wisp*.9);                                                                // 섬을 감싸는 구름 자락`};
 function makeFS(M){
   if(!Number.isInteger(M.treeCount)||M.treeCount<0||M.treeCount>8)throw new Error('Invalid tree count');
   M=sceneMode==='day'?{...MAPS[0],treeCount:MAP_SCENES.dayTrees.length}:M;
@@ -280,28 +350,20 @@ vec3 sky(vec3 rd){
     float ridge=.028+.025*vn(vec2(az*17.,4.))+.012*sin(az*51.);
     c=mix(c,vec3(.24,.38,.27),1.-smoothstep(ridge,ridge+.008,e));
     c=mix(c,vec3(.12,.26,.13),1.-smoothstep(ridge-.025,ridge-.018,e));
-    // A single white doorway rests on a tiny cloud in the open sky.
+    // 하늘의 꿈 장치(문 · 신전 · 떠 있는 섬). 자리는 JS doorSpot()이 나무·패널에 안 가리는 하늘에서 고른다.
+    // 모두 화면 좌표의 식 몇 줄이라 하늘 픽셀에서만 계산되고 반복문도 없다.
     vec2 dream=vec2(dot(rd,uCu),dot(rd,uCv))/max(.01,dot(rd,uCw));
-    vec2 door=dream-uDoorUV;  // 자리는 JS doorSpot()이 나무·패널에 안 가리는 하늘에서 고른다
-    float frame=(1.-smoothstep(.024,.028,abs(door.x)))*(1.-smoothstep(.054,.058,abs(door.y)));
-    float cloudlet=1.-smoothstep(.85,1.05,length((door+vec2(0.,.065))/vec2(.11,.03)));
-    c+=vec3(1.,.96,.86)*.32*exp(-dot(door/vec2(.06,.10),door/vec2(.06,.10)));  // 문 뒤 은은한 빛
-    // 드림코어 장치 둘. 모두 화면 좌표의 식 몇 줄이라 하늘 픽셀에서만 계산되고 반복문도 없다.
-    // ① 문 뒤 옅은 무지개 고리: 문 아래를 중심으로 한 반원, 바깥 빨강 → 안쪽 보라
-    float rr=(length((door-vec2(0.,-.10))*vec2(1.,1.15))-.17)/.05;
+    vec2 door=dream-uDoorUV;
+    c+=vec3(1.,.96,.86)*${SKY_MOTIF==='door'?.32:.14}*exp(-dot(door/vec2(${SKY_EXT[0]*1.4},${SKY_EXT[1]*1.2}),door/vec2(${SKY_EXT[0]*1.4},${SKY_EXT[1]*1.2})));  // 뒤의 은은한 빛
+    // ① 옅은 무지개 고리: 아래를 중심으로 한 반원, 바깥 빨강 → 안쪽 보라
+    float rr=(length((door-vec2(0.,-.10))*vec2(1.,1.15))-${SKY_EXT[4]})/.05;
     vec3 bow=.55+.45*cos(6.2832*(clamp(rr,0.,1.)*.75+vec3(0.,.33,.67)));
     c=mix(c,bow,.20*smoothstep(0.,.25,rr)*(1.-smoothstep(.75,1.,rr))*smoothstep(-.06,.02,door.y+.10)*smoothstep(.02,.10,e));
-    // ② 하늘에 떠서 문으로 이어지는 계단: 구름 조각 왼쪽에서 아래로 다섯 칸, 멀어질수록 희미하게 녹는다
-    float si=floor((-door.x-.10)/.045), top=-.075-si*.03;
+    // ② 하늘에 떠서 이어지는 계단: 왼쪽 아래에서 다섯 칸, 멀어질수록 희미하게 녹는다
+    float si=floor((-door.x-${SKY_EXT[3]})/.045), top=${SKY_EXT[5]}-si*.03;
     float stair=step(0.,si)*step(si,4.)*(1.-smoothstep(.0,.004,door.y-top))*smoothstep(-.016,-.012,door.y-top);
     c=mix(c,mix(vec3(.80,.80,.92),vec3(1.,.99,.97),smoothstep(-.006,-.002,door.y-top)),stair*(1.-si*.17));
-    c=mix(c,vec3(.96,.95,1.),cloudlet*.96);
-    float rim=(1.-smoothstep(.029,.033,abs(door.x)))*(1.-smoothstep(.059,.063,abs(door.y)))*(1.-frame);
-    c=mix(c,vec3(.14,.18,.30),rim*.8);  // 옅은 남회색 윤곽: 흰 구름 앞에서도 문 모양이 읽힌다
-    c=mix(c,vec3(2.2,2.15,2.05),frame);  // 톤매핑 뒤에도 가장 흰 물체
-    float gap=(1.-smoothstep(.003,.007,door.x-.010))*step(.004,door.x)*(1.-smoothstep(.048,.052,abs(door.y)));
-    c=mix(c,vec3(2.4,1.7,.7),gap);  // 살짝 열린 문틈으로 따뜻한 빛
-    c=mix(c,vec3(.55,.68,.85),frame*(1.-smoothstep(.002,.005,abs(door.x+.012)))*(1.-smoothstep(.040,.044,abs(door.y)))*.6);  // 문판 홈
+${SKY_GLSL[SKY_MOTIF]}
     return c;
   }
   vec3 c=mix(vec3(.600,.720,.800),vec3(.025,.150,.300),smoothstep(-.04,.30,e));
@@ -959,8 +1021,8 @@ function doorSpot(){
     return DAY_TREES_ON.filter(([x,y,z,s])=>hit([x,y+2.4*s,z],2.*s)||hit([x,y+4.4*s,z],1.6*s));
   };
   let best=null;
-  for(const dy of [.22,.17,.27,.12,.31,.37,.44,.52])for(const dx of [.16,.06,.26,-.04,.36,-.14,.46,-.24]){
-    const pts=[[0,0],[-.03,.06],[.03,.06],[-.03,-.05],[.03,-.05],[0,-.065],[-.1,-.065],[.1,-.065]].map(([ax,ay])=>hits([dx+ax,dy+ay]));
+  for(const dy of [.22,.17,.27,.12,.31,.37,.44,.48,.52])for(const dx of [.16,.06,.26,-.04,.36,-.14,.46,-.24,.11,.21,.31,.01,.41]){
+    const [ew,et,eb]=SKY_EXT,pts=[[0,0],[-ew,et],[ew,et],[-ew,0],[ew,0],[-ew,eb],[ew,eb],[0,eb],[-ew-.07,eb],[ew+.07,eb]].map(([ax,ay])=>hits([dx+ax,dy+ay]));
     if(pts.some(p=>!p))continue;
     const ts=[...new Set(pts.flat())];
     if(ts.length>2||ts.some(([x,y,z])=>Math.hypot(x-CAM.ro[0],z-CAM.ro[2])<25))continue;
