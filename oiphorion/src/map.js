@@ -304,11 +304,8 @@ const objSrc=(M,name,dw)=>`vec2 ${name}(vec3 p,float foliage){
   for(int i=0;i<10;i++){if(gNM[i]<.5)continue;vec3 q=p-uNodes[i].xyz;float b=length(q)-3.;float dd=b>.4?b:sdNode(q);if(uDay>.5&&b<.4)dd=min(sdBox(q-vec3(0.,.7,0.),vec3(.09,.9,.09)),sdBox(q-vec3(0.,1.7,0.),vec3(.8,.32,.12)));if(dd<d){d=dd;id=10.+float(i);}}
   // 하루: 침엽수와 활엽수를 따로 돈다. 한 반복 안에서 '조건 ? 침엽수 : 활엽수'로 고르면 GPU가 두 모양을 다 계산하는 일이 많다.
   // 경계도 모양에 맞춘다: 침엽수는 좁고 긴 원기둥, 활엽수는 세운 캡슐.
-  if(foliage>.5){${sceneMode==='day'?`
-    for(int i=0;i<${MAP_SCENES.dayConifers};i++){if(gTM[i]<.5)continue;vec4 a=uTrees[i*3];float s=a.w/1.45;vec3 q=p-a.xyz+vec3(0.,2.35*s,0.);
-      float dd=max(length(q.xz)-1.6*s,abs(q.y-3.15*s)-3.25*s);if(dd<.4)dd=coniferT(q/s).x*s;if(dd<d){d=dd;id=2.;}}
-    for(int i=${MAP_SCENES.dayConifers};i<${M.treeCount};i++){if(gTM[i]<.5)continue;vec4 a=uTrees[i*3];float s=a.w/1.45;vec3 q=p-a.xyz+vec3(0.,2.35*s,0.);
-      float dd=length(q-vec3(0.,clamp(q.y,s,3.4*s),0.))-2.65*s;if(dd<.4)dd=leafyT(q/s,float(i)).x*s;if(dd<d){d=dd;id=2.;}}`:`
+  // 하루 나무는 main에서 따로 걷고 법선은 dayTreeN이 재므로 여기엔 없다(있으면 if 안이라도 매 걸음 실행된다).
+  if(foliage>.5){${sceneMode==='day'?'':`
     for(int i=0;i<${M.treeCount};i++){if(gTM[i]<.5)continue;vec4 a=uTrees[i*3];float s=a.w/1.45;vec3 q=p-a.xyz+vec3(0.,2.35*s,0.);
       float dd=length(q-vec3(0.,2.85*s,0.))-3.2*s;
       // 주간은 두 capped cone의 보수적 거리(멀리서 보는 작은 나무)
@@ -382,6 +379,10 @@ float hm(vec2 xz){
 vec4 cl(vec2 xz){return texture2D(uCl,xz/CS);}
 float ch(vec2 xz){return CY+cl(xz).r*CA;}
 // 세 층의 산맥은 하늘에서 계산한다. 추가 레이마칭이나 FBM은 없다.
+// 반사용 가벼운 하늘(하루): 꿈 장치·구름·산맥 없이 색 기울기만. 하늘 함수 전체가 셰이더에 또 복사되지 않게.
+vec3 skyLite(vec3 rd){float e=rd.y;vec3 c=mix(vec3(.72,.87,.98),vec3(.22,.50,.98),smoothstep(-.02,.62,e));return mix(c,vec3(1.,.80,.86),.55*(1.-smoothstep(0.,.17,e)));}
+float gGiantId;  // 거대한 나무 걷기에서 얻은 부위(0 줄기·1 금줄·2 잎)
+vec3 gSky;  // main에서 한 번 계산한 이 픽셀의 하늘(여러 곳에서 다시 부르지 않는다)
 vec3 sky(vec3 rd){
   float e=rd.y,az=atan(rd.x,-rd.z);
   if(uDay>.5){
@@ -568,17 +569,20 @@ float treeBound(vec3 p,vec4 a){float s=a.w/1.45;return length(p-a.xyz-vec3(0.,.8
 void pickDayTree(vec3 p){float bd=1e5;
   for(int i=0;i<${sceneMode==='day'?MAP_SCENES.dayConifers:0};i++){vec4 a=uTrees[i*3];if(treeBound(p,a)>.5)continue;float d=conD(p,a);if(d<bd){bd=d;gTA=a;gTI=float(i);}}
   for(int i=${sceneMode==='day'?MAP_SCENES.dayConifers:0};i<${M.treeCount};i++){vec4 a=uTrees[i*3];if(treeBound(p,a)>.5)continue;float d=leafD(p,a,float(i));if(d<bd){bd=d;gTA=a;gTI=float(i);}}}
-vec3 dayTreeN(vec3 p){vec2 e=vec2(.006,-.006);
-  if(gTI<CONIF)return normalize(e.xyy*conD(p+e.xyy,gTA)+e.yyx*conD(p+e.yyx,gTA)+e.yxy*conD(p+e.yxy,gTA)+e.xxx*conD(p+e.xxx,gTA));
-  return normalize(e.xyy*leafD(p+e.xyy,gTA,gTI)+e.yyx*leafD(p+e.yyx,gTA,gTI)+e.yxy*leafD(p+e.yxy,gTA,gTI)+e.xxx*leafD(p+e.xxx,gTA,gTI));}
+// 법선은 사면체 네 점의 거리로 잰다. 반복문으로 써서 거리 함수가 셰이더에 한 번만 들어가게 한다(펼쳐 쓰면 네 벌로 복사돼 첫 컴파일이 길어진다).
+vec3 tet(int i){return i==0?vec3(1.,-1.,-1.):i==1?vec3(-1.,-1.,1.):i==2?vec3(-1.,1.,-1.):vec3(1.);}
+float gPartY;  // 법선을 재면서 함께 얻은 '잎(1)·줄기(0)' — 색칠에서 나무 모양을 또 계산하지 않게
+vec3 dayTreeN(vec3 p){vec3 n=vec3(0.);float s=gTA.w/1.45;
+  for(int i=0;i<4;i++){vec3 k=tet(i),q=(p+k*.006-gTA.xyz)/s+vec3(0.,2.35,0.);vec2 r=gTI<CONIF?coniferT(q):leafyT(q,gTI);n+=k*r.x;if(i==0)gPartY=r.y;}
+  return normalize(n);}
 // 광선마다 미리 고른 '가까이 지나갈 수 있는' 나무·표지(1이면 계산). 광선이 경계 구를 아예 안 지나면 그 물체는 걷는 동안 건너뛴다.
 // 직선이 들어가지 않는 구는 아무리 성큼 걸어도 뚫지 않으므로 안전하고, 걸음도 길어진다. 색칠·법선 단계에서는 모두 1.
 float gTM[${M.treeCount}],gNM[10],gRM[${ROCKS.length}],gOM[6],gHM[6];  // gOM: 천막·안내판·깃발·옛 문·소년·망가진 트램펄린
 float rayNear(vec3 ro,vec3 rd,vec3 c,float r){vec3 o=c-ro;float b=dot(o,rd);return step(-r,b)*step(dot(o,o)-b*b,r*r);}
 void objMaskAll(){for(int i=0;i<${M.treeCount};i++)gTM[i]=1.;for(int i=0;i<10;i++)gNM[i]=1.;for(int i=0;i<${ROCKS.length};i++)gRM[i]=1.;
   for(int i=0;i<4;i++)gOM[i]=1.;gOM[4]=1.;gOM[5]=uBroken.y>-100.?1.:0.;for(int i=0;i<6;i++)gHM[i]=uHats[i].y>-100.?1.:0.;}
-${objSrc(M,'obj',true)}${objSrc(M,'objM',false)}float objNormalDistance(vec3 p){return obj(p,${sceneMode==='day'?'0.':'1.'}).x;}
-vec3 objN(vec3 p){vec2 e=vec2(.004,-.004);return normalize(e.xyy*objNormalDistance(p+e.xyy)+e.yyx*objNormalDistance(p+e.yyx)+e.yxy*objNormalDistance(p+e.yxy)+e.xxx*objNormalDistance(p+e.xxx));}
+${objSrc(M,'objM',false)}float objNormalDistance(vec3 p){return min(dwarf(p).x,objM(p,${sceneMode==='day'?'0.':'1.'}).x);}
+vec3 objN(vec3 p){vec3 n=vec3(0.);for(int i=0;i<4;i++){vec3 k=tet(i);n+=k*objNormalDistance(p+k*.004);}return normalize(n);}
 float shadow(vec3 p,float withDw){
   float res=1.,t=.25;
   // Day hills have a maximum slope below .06; the high sun cannot be occluded by them.
@@ -762,7 +766,7 @@ vec3 shadeObj(vec3 p,vec3 rd,float id,float t){
     if(uDay>.5){
       // BotW풍: 잔무늬 대신 큰 면의 부드러운 2단 명암. 빛은 색에 넣고 마지막 조명은 평평하게(toon)
       float s=gTA.w/1.45;vec3 tv=(p-gTA.xyz)/s+vec3(0.,2.35,0.);bool con=gTI<CONIF;
-      vec2 part;if(con)part=coniferT(tv);else part=leafyT(tv,gTI);
+      vec2 part=vec2(0.,gPartY);
       float tone=smoothstep(.32,.72,(dot(n,uL)*.5+.5)*mix(.55,1.,sh));toon=1.;
       if(part.y<.5){  // 줄기·가지: 갈색 나무껍질, 위를 향한 면엔 이끼
         vec3 w=con?tv:rotY(tv,gTI*2.39);
@@ -795,7 +799,7 @@ vec3 shadeObj(vec3 p,vec3 rd,float id,float t){
   vec3 col=alb*(SUN*dif+AMB*(.6+.4*n.y));
   if(toon>.5){col=alb*(SUN*.36+AMB*.55);spec=0.;}  // 명암은 이미 색에 들어 있다
   col+=SUN*spec*pow(max(dot(normalize(uL-rd),n),0.),gloss)*sh*(gloss>50.?1.2:.3);
-  col+=spec*sky(ref)*(.08+.9*fre)*(gloss>50.?1.:.3);
+  col+=spec*${sceneMode==='day'?'skyLite':'sky'}(ref)*(.08+.9*fre)*(gloss>50.?1.:.3);
   col+=alb*emi*vec3(1.,.97,.9);
   if(uDay>.5){
     // 해를 등진 잎은 햇빛이 비쳐 연둣빛으로 빛난다(수관 바깥쪽만)
@@ -814,7 +818,7 @@ float houseD(vec3 p){vec3 q=rotY(p-uHouse.xyz,uHouse.w);
   float chim=max(sdBox(q-vec3(1.25,3.9,-.55),vec3(.2,.6,.2)),-qy);
   return min(min(walls,roof),chim);}
 vec3 shadeHouse(vec3 p,vec3 rd){
-  vec2 e=vec2(.01,-.01);vec3 n=normalize(e.xyy*houseD(p+e.xyy)+e.yyx*houseD(p+e.yyx)+e.yxy*houseD(p+e.yxy)+e.xxx*houseD(p+e.xxx));
+  vec3 n=vec3(0.);for(int i=0;i<4;i++){vec3 k=tet(i);n+=k*houseD(p+k*.01);}n=normalize(n);
   vec3 q=rotY(p-uHouse.xyz,uHouse.w),alb=lin(vec3(.95,.94,.90));
   if(q.y>2.62||(q.y>2.45&&abs(q.z)>1.52))alb=lin(vec3(.80,.10,.07));        // 붉은 지붕(처마 포함)
   if(abs(q.x-1.25)<.21&&abs(q.z+.55)<.21&&q.y>3.)alb=lin(vec3(.86,.85,.82));  // 굴뚝
@@ -840,8 +844,8 @@ vec2 giantD(vec3 p){vec3 q=p-uGiant;vec2 d2=q.xz-giantAxis(q.y);float an=atan(d2
   if(lv*.7<d){d=lv*.7;id=2.;}                                                             // 잎 뭉치
   return vec2(d,id);}
 vec3 shadeGiant(vec3 p,vec3 rd){
-  vec2 e=vec2(.04,-.04);vec3 n=normalize(e.xyy*giantD(p+e.xyy).x+e.yyx*giantD(p+e.yyx).x+e.yxy*giantD(p+e.yxy).x+e.xxx*giantD(p+e.xxx).x);
-  vec3 q=p-uGiant;vec2 d2=q.xz-giantAxis(q.y);float an=atan(d2.y,d2.x),id=giantD(p).y;
+  vec3 n=vec3(0.);for(int i=0;i<4;i++){vec3 k=tet(i);n+=k*giantD(p+k*.04).x;}n=normalize(n);
+  vec3 q=p-uGiant;vec2 d2=q.xz-giantAxis(q.y);float an=atan(d2.y,d2.x),id=gGiantId;
   float tone=smoothstep(.3,.75,dot(n,uL)*.5+.5);vec3 alb;
   if(id>1.5){alb=mix(vec3(.026,.08,.048),vec3(.19,.40,.065),tone);alb=mix(alb,vec3(.44,.60,.12),smoothstep(.5,.95,n.y)*tone*.55);}
   else if(id>.5)alb=mix(vec3(.16,.12,.06),vec3(.62,.52,.30),tone);                       // 새끼줄
@@ -850,7 +854,7 @@ vec3 shadeGiant(vec3 p,vec3 rd){
     float root=exp(-q.y/3.6)*pow(.5+.5*cos(an*5.+1.),4.);alb*=.65+.35*smoothstep(.0,.25,root+.3*smoothstep(3.,12.,q.y));  // 뿌리 사이 골은 어둡게
     alb=mix(alb,mix(vec3(.04,.08,.02),vec3(.20,.33,.07),tone),smoothstep(.5,.9,n.y+.3*furrow)*.5);}  // 위를 향한 면에만 이끼 조금
   vec3 col=fogit(alb*(SUN*.36+AMB*.55),length(p-uRo)*.55,rd);                            // 크고 진하게 서 있도록 공기 원근은 절반만
-  return mix(col,sky(rd),smoothstep(70.,420.,q.y));}                                       // 높이 올라갈수록 하늘에 녹는다
+  return mix(col,gSky,smoothstep(70.,420.,q.y));}                                       // 높이 올라갈수록 하늘에 녹는다
 void main(){
   objMaskAll();
   vec2 uv=(2.*gl_FragCoord.xy-uRes)/uRes.y;
@@ -923,15 +927,16 @@ void main(){
   float gt=-1.;
   if(uDay>.5){vec2 o=ro.xz-uGiant.xz;float a=dot(rd.xz,rd.xz),b=dot(o,rd.xz),c=dot(o,o)-1225.,hh=b*b-a*c;
     if(hh>0.&&a>1e-6){float t=max((-b-sqrt(hh))/a,.5),te=(-b+sqrt(hh))/a;
-      for(int i=0;i<56;i++){if(t>te)break;float d=giantD(ro+rd*t).x;if(d<.002*t){gt=t;break;}t+=max(d,.02);}
+      for(int i=0;i<56;i++){if(t>te)break;vec2 gd=giantD(ro+rd*t);float d=gd.x;if(d<.002*t){gt=t;gGiantId=gd.y;break;}t+=max(d,.02);}
       if(gt>0.&&((ot>0.&&ot<gt)||(hit>0.&&hit<gt)||(ht>0.&&ht<gt)))gt=-1.;}}
+  gSky=sky(rd);
   vec3 col;
   if(gt>0.){col=shadeGiant(ro+rd*gt,rd);}
   else if(ht>0.){col=fogit(shadeHouse(ro+rd*ht,rd),ht,rd);}
   else if(ot>0.){col=shadeObj(ro+rd*ot,rd,oid,ot);col=fogit(col,ot,rd);}
-  else if(hit>0.){vec3 p=ro+rd*hit;col=kind<1.5?fogit(shadeGround(p,rd,hit),hit,rd):mix(fogit(shadeCloud(p,rd,hit),hit,rd),sky(rd),smoothstep(260.,650.,hit));}
-  else if(rd.y<0.){float tt=(CY+2.-ro.y)/rd.y;col=mix(fogit(shadeCloud(ro+rd*tt,rd,tt),tt,rd),sky(rd),smoothstep(260.,650.,tt));}
-  else col=sky(rd);
+  ${sceneMode==='day'?`else if(hit>0.){vec3 p=ro+rd*hit;col=fogit(shadeGround(p,rd,hit),hit,rd);}`:`else if(hit>0.){vec3 p=ro+rd*hit;col=kind<1.5?fogit(shadeGround(p,rd,hit),hit,rd):mix(fogit(shadeCloud(p,rd,hit),hit,rd),gSky,smoothstep(260.,650.,hit));}
+  else if(rd.y<0.){float tt=(CY+2.-ro.y)/rd.y;col=mix(fogit(shadeCloud(ro+rd*tt,rd,tt),tt,rd),gSky,smoothstep(260.,650.,tt));}`}  // 하루에는 구름 바다가 없다
+  else col=gSky;
   // 문 빛
   {vec3 dc=uDoor+vec3(0.,1.3,0.)-ro;float b=dot(dc,rd);if(b>0.){float g=length(dc-rd*b);col+=lin(vec3(1.,.95,.8))*.7*exp(-g*g*.12)*(hit<0.||hit>b-2.?1.:.0);}}
   col=1.-exp(-col*1.85);
@@ -999,6 +1004,7 @@ function useMapProgram(n){
 }
 const DAY_TREES_ON=[];let DOOR_UV=[9,9];  // 하늘 문 자리(doorSpot)
 function bindScenery(){
+  if(!CAM)return;  // 첫 로딩에서 카메라보다 셰이더를 먼저 만든다. 그릴 때 다시 불린다
   gl.uniform1i(U.uHm,0); gl.uniform1i(U.uCl,1); gl.uniform1i(U.uPath,2);
   gl.uniform2f(U.uHN,DOM.nx,DOM.nz); gl.uniform4f(U.uDom,DOM.x0,DOM.z0,DOM.x1-DOM.x0,DOM.z1-DOM.z0);
   const L=v3.norm([-.62,.66,.42]); gl.uniform3f(U.uL,L[0],L[1],L[2]);
@@ -1085,8 +1091,9 @@ function adaptQuality(ms){
   if(q!==QUALITY){ QUALITY=q; store.set("oi.quality",String(q)); }
   window.__quality=QUALITY;
 }
+let bootHold=true;  // 저장 기록이 오기 전에는 풍경을 그리지 않는다(같은 장면을 두 번 그리지 않게)
 function render(){
-  if(!gl) return;
+  if(!gl||bootHold) return;
   if((mapNo!==compiledMap||sceneMode!==compiledScene)&&!useMapProgram(mapNo))mapNo=compiledMap;
   bindScenery();
   cancelAnimationFrame(raster.raf);
@@ -1449,13 +1456,19 @@ function layoutAll(){
   placeDwarf(NXZ[at][0],NXZ[at][1]); refresh(true);
 }
 (function init(){
+  window.__boot={initMs:performance.now()};  // 첫 로딩 단계 시각(시험·측정용): initMs → glMs(셰이더 준비) → dbMs(저장 기록) → 첫 풍경은 __firstRenderMs
   setDay(dayIdx);
   restoreTodayWake();
   const W=toMin(wakeEl.value)??450, woke=toMin(wokeEl.value)??W; state={W,line:computeLine(W,woke)};
   document.getElementById("days").addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b) return; setDay(+b.dataset.d); restoreTodayWake(); if(walking){ cancelAnimationFrame(walking.raf); at=walking.to; walking=null; dw.classList.add("idle"); } placeDwarf(NXZ[at][0],NXZ[at][1]); refresh(true); });
   const h=location.hash.slice(1), n=nowId(); at=sel=(h&&NXZ[h])?h:(n||"dawn");
   // Let DB bindings finish before synchronous shader compilation can occupy the main thread.
-  document.body.classList.add("journey-day"); layoutAll();
+  document.body.classList.add("journey-day");
+  // 첫 로딩: WebGL 만들기·셰이더 컴파일을 저장 기록을 기다리는 동안 미리 한다. 1픽셀을 한 번 그려 두면
+  // GPU 쪽(SwiftShader)이 셰이더를 기계어로 옮기는 일(가장 긴 단계)을 그동안 뒤에서 해 둔다.
+  if(initGL()){gl.enable(gl.SCISSOR_TEST);gl.scissor(0,0,1,1);gl.drawArrays(gl.TRIANGLES,0,3);gl.flush();}
+  window.__boot.glMs=performance.now();
+  layoutAll();
   let to,lastW=VW.W; window.addEventListener("resize",()=>{ clearTimeout(to); to=setTimeout(()=>{ if(Math.abs(stageEl.clientWidth-lastW)>2){ lastW=stageEl.clientWidth; layoutAll(); } },180); });
   let calendarDate=JOURNEY.todayKey();
   const updateCalendar=()=>{
@@ -1464,7 +1477,7 @@ function layoutAll(){
   };
   document.addEventListener("visibilitychange",updateCalendar);
   setInterval(()=>{ updateCalendar(); decorate(); if(!walking) showInfo(); },60000);
-  JOURNEY.ready.then(()=>{ applyJourney(); if(state.line===3&&!location.hash)at=sel='minimum'; initGL(); layoutAll(); JOURNEY.onChange(applyJourney);
+  JOURNEY.ready.then(()=>{ window.__boot.dbMs=performance.now(); bootHold=false; applyJourney(); if(state.line===3&&!location.hash)at=sel='minimum'; layoutAll(); JOURNEY.onChange(applyJourney);
     const ready=()=>{ if(gl&&!raster.done){ requestAnimationFrame(ready); return; } window.__journeyReady=true; }; ready();
   }).catch(e=>console.error(e));  // db 처리와 첫 렌더가 끝나면 시험용 준비 신호
 })();
