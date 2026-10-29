@@ -297,6 +297,47 @@ laputa:`    vec2 q=door*1.85;
     c=mix(c,vec3(1.9,1.95,2.),wf*.85);                                                                // 가장자리에서 떨어지는 가는 폭포
     float wisp=max(1.-smoothstep(.8,1.05,length((q+vec2(.10,.012))/vec2(.07,.016))),1.-smoothstep(.8,1.05,length((q-vec2(.12,-.03))/vec2(.06,.014))));
     c=mix(c,vec3(.97,.96,1.),wisp*.9);                                                                // 섬을 감싸는 구름 자락`};
+/* 물체 거리 함수. 걷기용(objM)은 소년을 뺀 사본이다: SwiftShader는 if 안의 코드도 늘 실행하므로 코드를 아예 빼야 걷는 비용이 준다.
+   소년은 main에서 따로 짧게 걷는다. 법선·색칠은 소년을 포함한 obj를 쓴다. */
+const objSrc=(M,name,dw)=>`vec2 ${name}(vec3 p,float foliage){
+  float d=1e5,id=0.;
+  for(int i=0;i<10;i++){if(gNM[i]<.5)continue;vec3 q=p-uNodes[i].xyz;float b=length(q)-3.;float dd=b>.4?b:sdNode(q);if(uDay>.5&&b<.4)dd=min(sdBox(q-vec3(0.,.7,0.),vec3(.09,.9,.09)),sdBox(q-vec3(0.,1.7,0.),vec3(.8,.32,.12)));if(dd<d){d=dd;id=10.+float(i);}}
+  // 하루: 침엽수와 활엽수를 따로 돈다. 한 반복 안에서 '조건 ? 침엽수 : 활엽수'로 고르면 GPU가 두 모양을 다 계산하는 일이 많다.
+  // 경계도 모양에 맞춘다: 침엽수는 좁고 긴 원기둥, 활엽수는 세운 캡슐.
+  if(foliage>.5){${sceneMode==='day'?`
+    for(int i=0;i<${MAP_SCENES.dayConifers};i++){if(gTM[i]<.5)continue;vec4 a=uTrees[i*3];float s=a.w/1.45;vec3 q=p-a.xyz+vec3(0.,2.35*s,0.);
+      float dd=max(length(q.xz)-1.6*s,abs(q.y-3.15*s)-3.25*s);if(dd<.4)dd=coniferT(q/s).x*s;if(dd<d){d=dd;id=2.;}}
+    for(int i=${MAP_SCENES.dayConifers};i<${M.treeCount};i++){if(gTM[i]<.5)continue;vec4 a=uTrees[i*3];float s=a.w/1.45;vec3 q=p-a.xyz+vec3(0.,2.35*s,0.);
+      float dd=length(q-vec3(0.,clamp(q.y,s,3.4*s),0.))-2.65*s;if(dd<.4)dd=leafyT(q/s,float(i)).x*s;if(dd<d){d=dd;id=2.;}}`:`
+    for(int i=0;i<${M.treeCount};i++){if(gTM[i]<.5)continue;vec4 a=uTrees[i*3];float s=a.w/1.45;vec3 q=p-a.xyz+vec3(0.,2.35*s,0.);
+      float dd=length(q-vec3(0.,2.85*s,0.))-3.2*s;
+      // 주간은 두 capped cone의 보수적 거리(멀리서 보는 작은 나무)
+      if(dd<.5){vec3 v=q/s;float r=length(v.xz);
+        float low=max((r-.765+(v.y-2.35)*.415152)*.9236,abs(v.y-2.35)-1.65);
+        float high=max((r-.535+(v.y-4.35)*.381481)*.9343,abs(v.y-4.35)-1.35);
+        dd=min(min(low,high),sdBox(v-vec3(0.,.55,0.),vec3(.10,.55,.10)))*s;}
+      if(dd<d){d=dd;id=2.;}}`}}
+  for(int i=0;i<${ROCKS.length};i++){if(gRM[i]<.5)continue;vec4 a=uRocks[i];vec3 q=rotY(p-a.xyz,.37+float(i)*.71);float bb=length(q)-2.;
+    float dd=bb>.3?bb:uDay>.5?smin(sdEll(q-vec3(0.,-.1,0.),vec3(1.45,.85,1.1)),sdEll(q-vec3(.55,.25,.2),vec3(.8,.6,.7)),.3):sdBox(q,vec3(1.35,.85,1.05))-.16;if(dd<d){d=dd;id=1.;}}
+  if(gOM[0]>.5){vec3 q=p-uTent;float b=length(q+vec3(0.,1.7,0.))-3.;float dd=b>.3?b:sdCone(q,vec2(.5,.866),3.4);if(dd<d){d=dd;id=4.;}}
+  if(gOM[1]>.5){vec3 q=p-uSign;float b=length(q-vec3(0.,3.,0.))-3.5;
+    if(b>.3){if(b<d){d=b;id=5.;}}
+    else{float pole=sdBox(q-vec3(0.,2.3,0.),vec3(.10,2.3,.10));vec3 r=rotY(q-vec3(0.,4.8,0.),uSignRot);float bd=sdBox(r,vec3(1.7,1.1,.09));
+      if(pole<d){d=pole;id=5.;} if(bd<d){d=bd;id=6.;}}}
+  if(gOM[2]>.5){vec3 q=p-uFlag;float b=length(q-vec3(.7,2.,0.))-2.4;
+    if(b>.3){if(b<d){d=b;id=7.;}}
+    else{float pole=sdBox(q-vec3(0.,1.9,0.),vec3(.06,1.9,.06));float fl=sdBox(q-vec3(.85,3.25,0.),vec3(.8,.48,.03));
+      if(pole<d){d=pole;id=7.;} if(fl<d){d=fl;id=8.;}}}
+  if(gOM[3]>.5){vec3 q=p-uDoor;float b=length(q-vec3(0.,1.3,0.))-2.;
+    if(b>.3){if(b<d){d=b;id=9.;}}
+    else{float fr=sdBox(q-vec3(0.,1.35,0.),vec3(.78,1.42,.1));float pn=sdBox(q-vec3(0.,1.3,.06),vec3(.64,1.28,.08));
+      if(fr<d){d=fr;id=9.;} if(pn<d){d=pn;id=9.5;}}}
+${dw?`  if(gOM[4]>.5){vec2 w=dwarf(p);if(w.x<d){d=w.x;id=w.y;}}`:''}
+  for(int i=0;i<6;i++){if(gHM[i]>.5){float h=lostHat(p,uHats[i]);if(h<d){d=h;id=21.;}}}
+  if(gOM[5]>.5){vec2 bt=brokenTramp(p);if(bt.x<d){d=bt.x;id=bt.y;}}
+  return vec2(d,id);
+}
+`;
 function makeFS(M){
   if(!Number.isInteger(M.treeCount)||M.treeCount<0||M.treeCount>8)throw new Error('Invalid tree count');
   M=sceneMode==='day'?{...MAPS[0],treeCount:MAP_SCENES.dayTrees.length}:M;
@@ -530,45 +571,13 @@ void pickDayTree(vec3 p){float bd=1e5;
 vec3 dayTreeN(vec3 p){vec2 e=vec2(.006,-.006);
   if(gTI<CONIF)return normalize(e.xyy*conD(p+e.xyy,gTA)+e.yyx*conD(p+e.yyx,gTA)+e.yxy*conD(p+e.yxy,gTA)+e.xxx*conD(p+e.xxx,gTA));
   return normalize(e.xyy*leafD(p+e.xyy,gTA,gTI)+e.yyx*leafD(p+e.yyx,gTA,gTI)+e.yxy*leafD(p+e.yxy,gTA,gTI)+e.xxx*leafD(p+e.xxx,gTA,gTI));}
-vec2 obj(vec3 p,float foliage){
-  float d=1e5,id=0.;
-  for(int i=0;i<10;i++){vec3 q=p-uNodes[i].xyz;float b=length(q)-3.;float dd=b>.4?b:sdNode(q);if(uDay>.5&&b<.4)dd=min(sdBox(q-vec3(0.,.7,0.),vec3(.09,.9,.09)),sdBox(q-vec3(0.,1.7,0.),vec3(.8,.32,.12)));if(dd<d){d=dd;id=10.+float(i);}}
-  // 하루: 침엽수와 활엽수를 따로 돈다. 한 반복 안에서 '조건 ? 침엽수 : 활엽수'로 고르면 GPU가 두 모양을 다 계산하는 일이 많다.
-  // 경계도 모양에 맞춘다: 침엽수는 좁고 긴 원기둥, 활엽수는 세운 캡슐.
-  if(foliage>.5){${sceneMode==='day'?`
-    for(int i=0;i<${MAP_SCENES.dayConifers};i++){vec4 a=uTrees[i*3];float s=a.w/1.45;vec3 q=p-a.xyz+vec3(0.,2.35*s,0.);
-      float dd=max(length(q.xz)-1.6*s,abs(q.y-3.15*s)-3.25*s);if(dd<.4)dd=coniferT(q/s).x*s;if(dd<d){d=dd;id=2.;}}
-    for(int i=${MAP_SCENES.dayConifers};i<${M.treeCount};i++){vec4 a=uTrees[i*3];float s=a.w/1.45;vec3 q=p-a.xyz+vec3(0.,2.35*s,0.);
-      float dd=length(q-vec3(0.,clamp(q.y,s,3.4*s),0.))-2.65*s;if(dd<.4)dd=leafyT(q/s,float(i)).x*s;if(dd<d){d=dd;id=2.;}}`:`
-    for(int i=0;i<${M.treeCount};i++){vec4 a=uTrees[i*3];float s=a.w/1.45;vec3 q=p-a.xyz+vec3(0.,2.35*s,0.);
-      float dd=length(q-vec3(0.,2.85*s,0.))-3.2*s;
-      // 주간은 두 capped cone의 보수적 거리(멀리서 보는 작은 나무)
-      if(dd<.5){vec3 v=q/s;float r=length(v.xz);
-        float low=max((r-.765+(v.y-2.35)*.415152)*.9236,abs(v.y-2.35)-1.65);
-        float high=max((r-.535+(v.y-4.35)*.381481)*.9343,abs(v.y-4.35)-1.35);
-        dd=min(min(low,high),sdBox(v-vec3(0.,.55,0.),vec3(.10,.55,.10)))*s;}
-      if(dd<d){d=dd;id=2.;}}`}}
-  for(int i=0;i<${ROCKS.length};i++){vec4 a=uRocks[i];vec3 q=rotY(p-a.xyz,.37+float(i)*.71);float bb=length(q)-2.;
-    float dd=bb>.3?bb:uDay>.5?smin(sdEll(q-vec3(0.,-.1,0.),vec3(1.45,.85,1.1)),sdEll(q-vec3(.55,.25,.2),vec3(.8,.6,.7)),.3):sdBox(q,vec3(1.35,.85,1.05))-.16;if(dd<d){d=dd;id=1.;}}
-  {vec3 q=p-uTent;float b=length(q+vec3(0.,1.7,0.))-3.;float dd=b>.3?b:sdCone(q,vec2(.5,.866),3.4);if(dd<d){d=dd;id=4.;}}
-  {vec3 q=p-uSign;float b=length(q-vec3(0.,3.,0.))-3.5;
-    if(b>.3){if(b<d){d=b;id=5.;}}
-    else{float pole=sdBox(q-vec3(0.,2.3,0.),vec3(.10,2.3,.10));vec3 r=rotY(q-vec3(0.,4.8,0.),uSignRot);float bd=sdBox(r,vec3(1.7,1.1,.09));
-      if(pole<d){d=pole;id=5.;} if(bd<d){d=bd;id=6.;}}}
-  {vec3 q=p-uFlag;float b=length(q-vec3(.7,2.,0.))-2.4;
-    if(b>.3){if(b<d){d=b;id=7.;}}
-    else{float pole=sdBox(q-vec3(0.,1.9,0.),vec3(.06,1.9,.06));float fl=sdBox(q-vec3(.85,3.25,0.),vec3(.8,.48,.03));
-      if(pole<d){d=pole;id=7.;} if(fl<d){d=fl;id=8.;}}}
-  {vec3 q=p-uDoor;float b=length(q-vec3(0.,1.3,0.))-2.;
-    if(b>.3){if(b<d){d=b;id=9.;}}
-    else{float fr=sdBox(q-vec3(0.,1.35,0.),vec3(.78,1.42,.1));float pn=sdBox(q-vec3(0.,1.3,.06),vec3(.64,1.28,.08));
-      if(fr<d){d=fr;id=9.;} if(pn<d){d=pn;id=9.5;}}}
-  vec2 w=dwarf(p);if(w.x<d){d=w.x;id=w.y;}
-  for(int i=0;i<6;i++){if(uHats[i].y>-100.){float h=lostHat(p,uHats[i]);if(h<d){d=h;id=21.;}}}
-  if(uBroken.y>-100.){vec2 bt=brokenTramp(p);if(bt.x<d){d=bt.x;id=bt.y;}}
-  return vec2(d,id);
-}
-float objNormalDistance(vec3 p){return obj(p,${sceneMode==='day'?'0.':'1.'}).x;}
+// 광선마다 미리 고른 '가까이 지나갈 수 있는' 나무·표지(1이면 계산). 광선이 경계 구를 아예 안 지나면 그 물체는 걷는 동안 건너뛴다.
+// 직선이 들어가지 않는 구는 아무리 성큼 걸어도 뚫지 않으므로 안전하고, 걸음도 길어진다. 색칠·법선 단계에서는 모두 1.
+float gTM[${M.treeCount}],gNM[10],gRM[${ROCKS.length}],gOM[6],gHM[6];  // gOM: 천막·안내판·깃발·옛 문·소년·망가진 트램펄린
+float rayNear(vec3 ro,vec3 rd,vec3 c,float r){vec3 o=c-ro;float b=dot(o,rd);return step(-r,b)*step(dot(o,o)-b*b,r*r);}
+void objMaskAll(){for(int i=0;i<${M.treeCount};i++)gTM[i]=1.;for(int i=0;i<10;i++)gNM[i]=1.;for(int i=0;i<${ROCKS.length};i++)gRM[i]=1.;
+  for(int i=0;i<4;i++)gOM[i]=1.;gOM[4]=1.;gOM[5]=uBroken.y>-100.?1.:0.;for(int i=0;i<6;i++)gHM[i]=uHats[i].y>-100.?1.:0.;}
+${objSrc(M,'obj',true)}${objSrc(M,'objM',false)}float objNormalDistance(vec3 p){return obj(p,${sceneMode==='day'?'0.':'1.'}).x;}
 vec3 objN(vec3 p){vec2 e=vec2(.004,-.004);return normalize(e.xyy*objNormalDistance(p+e.xyy)+e.yyx*objNormalDistance(p+e.yyx)+e.yxy*objNormalDistance(p+e.yxy)+e.xxx*objNormalDistance(p+e.xxx));}
 float shadow(vec3 p,float withDw){
   float res=1.,t=.25;
@@ -843,6 +852,7 @@ vec3 shadeGiant(vec3 p,vec3 rd){
   vec3 col=fogit(alb*(SUN*.36+AMB*.55),length(p-uRo)*.55,rd);                            // 크고 진하게 서 있도록 공기 원근은 절반만
   return mix(col,sky(rd),smoothstep(70.,420.,q.y));}                                       // 높이 올라갈수록 하늘에 녹는다
 void main(){
+  objMaskAll();
   vec2 uv=(2.*gl_FragCoord.xy-uRes)/uRes.y;
   vec3 rd=normalize(uv.x*uCu+uv.y*uCv+uFl*uCw);
   vec3 ro=uRo;
@@ -867,13 +877,42 @@ void main(){
     tp=t;t+=clamp(dy*.4,.03+t*.0015,30.);
     if(t>3000.)break;
   }
+  // 하루 나무: 공용 물체 걷기에서 빼고 나무마다 따로 짧게 걷는다(외딴집·거대한 나무와 같은 방식).
+  // 경계 구에 들어간 광선만 그 나무 하나의 모양으로 걷는다. SwiftShader는 if 안의 코드를 조건과 상관없이 실행하므로
+  // '건너뛰기'는 반복문이 끝나는 것으로만 생긴다(CLAUDE.md 함정 10).
+  float trT=-1.;
+  ${sceneMode==='day'?`{float tl=hit>0.?hit:1e4;
+    for(int i=0;i<${MAP_SCENES.dayConifers};i++){vec4 a=uTrees[i*3];float s=a.w/1.45;vec3 c=a.xyz+vec3(0.,.5*s,0.)-ro;float b=dot(c,rd),h=b*b-dot(c,c)+16.*s*s;
+      if(h>0.){float t=max(b-sqrt(h),.5),te=min(b+sqrt(h),tl);
+        for(int j=0;j<48;j++){if(t>te)break;vec3 q=ro+rd*t-a.xyz+vec3(0.,2.35*s,0.);float d=max(length(q.xz)-1.6*s,abs(q.y-3.15*s)-3.25*s);if(d<.4)d=coniferT(q/s).x*s;   // 세부 식은 감싼 원기둥 안에서만(밖에선 거리를 부풀려 층 가장자리를 뚫는다)
+       if(d<.0015*t){trT=t;tl=t;break;}t+=d*.9;}}}
+    for(int i=${MAP_SCENES.dayConifers};i<${M.treeCount};i++){vec4 a=uTrees[i*3];float s=a.w/1.45;vec3 c=a.xyz+vec3(0.,.5*s,0.)-ro;float b=dot(c,rd),h=b*b-dot(c,c)+16.*s*s;
+      if(h>0.){float t=max(b-sqrt(h),.5),te=min(b+sqrt(h),tl);
+        for(int j=0;j<48;j++){if(t>te)break;vec3 q=ro+rd*t-a.xyz+vec3(0.,2.35*s,0.);float d=length(q-vec3(0.,clamp(q.y,s,3.4*s),0.))-2.65*s;if(d<.4)d=leafyT(q/s,float(i)).x*s;
+       if(d<.0015*t){trT=t;tl=t;break;}t+=d*.9;}}}}`:''}
+  // 소년: 둘레 구에 들어간 광선만 소년 모양 하나로 촘촘히 걷는다(적중 기준 .0004*t, 얇은 테가 뭉개지지 않게)
+  float dwT=-1.,dwId=20.;
+  if(uDw2.z>.5){vec3 c=uDw.xyz+vec3(0.,2.1*uDw2.x,0.)-ro;float b=dot(c,rd),R=4.5*uDw2.x+1.,h=b*b-dot(c,c)+R*R;
+    if(h>0.){float t=max(b-sqrt(h),.5),te=b+sqrt(h);if(hit>0.)te=min(te,hit);if(trT>0.)te=min(te,trT);
+      for(int j=0;j<96;j++){if(t>te)break;vec2 w=dwarf(ro+rd*t);if(w.x<.0004*t){dwT=t;dwId=w.y;break;}t+=w.x*.9;}}}
   // 물건
-  vec3 bmin=vec3(-72.,-18.,-48.),bmax=vec3(56.,46.,48.);
+  vec3 bmin=vec3(-72.,-18.,-48.),bmax=vec3(56.,${sceneMode==='day'?22:46}.,48.);  // 하루 물체는 가장 높은 나무도 18 안팎이라 천장을 낮춰 하늘 광선이 빨리 빠져나가게
   vec3 iv=1./rd,t0=(bmin-ro)*iv,t1=(bmax-ro)*iv,tmn=min(t0,t1),tmx=max(t0,t1);
   float tn=max(max(tmn.x,tmn.y),tmn.z),tf=min(min(tmx.x,tmx.y),tmx.z);
   float oid=0.,ot=-1.;
   if(tf>max(tn,0.)){float tt=max(tn,.5);float lim=hit>0.?min(tf,hit):tf;
-    for(int i=0;i<160;i++){vec2 o=obj(ro+rd*tt,1.);if(o.x<(o.y>19.5?.0004:.0015)*tt){ot=tt;oid=o.y;break;}tt+=o.x*.9;if(tt>lim)break;}}
+    ${sceneMode==='day'?'':`for(int i=0;i<${M.treeCount};i++){vec4 a=uTrees[i*3];float s=a.w/1.45;vec3 c=a.xyz+vec3(0.,.35*s,0.)-ro;float b=dot(c,rd),r=4.2*s+.3;gTM[i]=step(-r,b)*step(dot(c,c)-b*b,r*r);}`}
+    for(int i=0;i<10;i++)gNM[i]=rayNear(ro,rd,uNodes[i].xyz,3.3);
+    for(int i=0;i<${ROCKS.length};i++)gRM[i]=rayNear(ro,rd,uRocks[i].xyz,2.4);
+    gOM[0]=rayNear(ro,rd,uTent-vec3(0.,1.7,0.),3.4);gOM[1]=rayNear(ro,rd,uSign+vec3(0.,3.,0.),3.9);gOM[2]=rayNear(ro,rd,uFlag+vec3(.7,2.,0.),2.8);
+    gOM[3]=rayNear(ro,rd,uDoor+vec3(0.,1.3,0.),2.4);gOM[4]=uDw2.z>.5?rayNear(ro,rd,uDw.xyz+vec3(0.,2.1*uDw2.x,0.),4.5*uDw2.x+1.):0.;
+    gOM[5]=uBroken.y>-100.?rayNear(ro,rd,uBroken.xyz,2.*uDw2.x+.5):0.;
+    for(int i=0;i<6;i++)gHM[i]=uHats[i].y>-100.?rayNear(ro,rd,uHats[i].xyz,1.6*uDw2.x+.4):0.;
+    if(trT>0.)lim=min(lim,trT);if(dwT>0.)lim=min(lim,dwT);
+    for(int i=0;i<160;i++){vec2 o=objM(ro+rd*tt,${sceneMode==='day'?'0.':'1.'});if(o.x<(o.y>19.5?.0004:.0015)*tt){ot=tt;oid=o.y;break;}tt+=o.x*.9;if(tt>lim)break;}
+    objMaskAll();}
+  if(trT>0.&&(ot<0.||trT<ot)){ot=trT;oid=2.;}
+  if(dwT>0.&&(ot<0.||dwT<ot)){ot=dwT;oid=dwId;}
   // 외딴집: 경계 구(반지름 3.8)와 만나는 광선만 집 모양으로 짧게 걷는다
   float ht=-1.;
   if(uDay>.5){vec3 oc=ro-uHouse.xyz-vec3(0.,2.1,0.);float b=dot(oc,rd),hh=b*b-dot(oc,oc)+14.44;
