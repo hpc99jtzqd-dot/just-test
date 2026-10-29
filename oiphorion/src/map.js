@@ -221,10 +221,10 @@ function project(P){ const d=v3.sub(P,CAM.ro), z=v3.dot(d,CAM.cw); const ux=v3.d
 const VS="attribute vec2 a;void main(){gl_Position=vec4(a,0.,1.);}";
 const glslFloat=n=>{if(!Number.isFinite(n))throw new Error('Non-finite scenery constant');return Number.isInteger(n)?n+'.0':String(n);};
 const glslColor=a=>'vec3('+a.map(glslFloat).join(',')+')';
-/* 하늘의 꿈 장치: 'door'(구름 위 하얀 문) · 'temple'(올림포스풍 신전) · 'laputa'(떠 있는 섬). 주소 ?sky= 로 고른다(시안 비교용).
+/* 하늘의 꿈 장치: 'laputa'(떠 있는 섬, 기본·민 선택 2026-10-29) · 'door'(예전 구름 위 하얀 문) · 'temple'(올림포스풍 신전 시안). 주소 ?sky= 로 바꿔 본다.
    SKY_EXT: 반너비, 위, 아래(doorSpot이 가림을 잴 범위), 계단 시작, 무지개 고리 반지름, 계단 첫 칸 높이 */
-const SKY_MOTIF=(()=>{try{const v=new URLSearchParams(location.search).get('sky');return ['door','temple','laputa'].includes(v)?v:'door';}catch(e){return 'door';}})();
-const SKY_EXT={door:[.03,.06,-.065,.10,.17,-.075],temple:[.105,.08,-.08,.16,.21,-.07],laputa:[.11,.13,-.13,.13,.22,-.03]}[SKY_MOTIF];
+const SKY_MOTIF=(()=>{try{const v=new URLSearchParams(location.search).get('sky');return ['door','temple','laputa'].includes(v)?v:'laputa';}catch(e){return 'laputa';}})();
+const SKY_EXT={door:[.03,.06,-.065,.10,.17,-.075],temple:[.105,.08,-.08,.16,.21,-.07],laputa:[.075,.088,-.09,.10,.19,-.03]}[SKY_MOTIF];
 const SKY_GLSL={
 door:`    float frame=(1.-smoothstep(.024,.028,abs(door.x)))*(1.-smoothstep(.054,.058,abs(door.y)));
     float cloudlet=1.-smoothstep(.85,1.05,length((door+vec2(0.,.065))/vec2(.11,.03)));
@@ -263,11 +263,17 @@ temple:`    vec2 q=door;
     c=mix(c,vec3(.86,.84,1.05),tym*.8);                                                               // 박공 안쪽 그늘
     c=mix(c,vec3(2.3,1.9,1.1),tym*(1.-smoothstep(.003,.0045,length(q-vec2(0.,.056)))));                  // 박공 가운데 작은 해 문양`,
 // 라퓨타풍 떠 있는 섬: 아래는 층층 바위가 거꾸로 뾰족하게 매달리고, 가장자리엔 성벽과 청록 지붕 탑, 위엔 거대한 나무, 오른쪽으로 가는 폭포.
-laputa:`    vec2 q=door*1.25;
+laputa:`    vec2 q=door*1.85;
     float tr=min(length(q-vec2(0.,.078))-.064,min(length(q-vec2(-.058,.046))-.044,min(length(q-vec2(.06,.05))-.042,min(length(q-vec2(.022,.118))-.04,length(q-vec2(-.03,.11))-.036))));
     float trunk=step(abs(q.x),.01)*step(0.,q.y)*step(q.y,.04);
     c=mix(c,vec3(.30,.20,.12),trunk);
-    float crown=1.-smoothstep(-.0015,.0015,tr),tone=smoothstep(-.2,.6,dot(normalize(q-vec2(0.,.07)),vec2(-.6,.8)));
+    float crown=1.-smoothstep(-.0015,.0015,tr);
+    vec2 bc=vec2(0.,.078);float bd=length(q-bc)-.064;                                                 // 맞은 잎 뭉치의 중심으로 명암(뭉치마다 둥글게)
+    if(length(q-vec2(-.058,.046))-.044<bd){bc=vec2(-.058,.046);bd=length(q-bc)-.044;}
+    if(length(q-vec2(.06,.05))-.042<bd){bc=vec2(.06,.05);bd=length(q-bc)-.042;}
+    if(length(q-vec2(.022,.118))-.04<bd){bc=vec2(.022,.118);bd=length(q-bc)-.04;}
+    if(length(q-vec2(-.03,.11))-.036<bd){bc=vec2(-.03,.11);}
+    float tone=smoothstep(-.1,.5,dot(normalize(q-bc+vec2(0.,1e-4)),vec2(-.6,.8)));
     c=mix(c,vec3(.10,.22,.16),(1.-smoothstep(-.0015,.0045,tr))*(1.-crown)*.6);                          // 수관 윤곽
     c=mix(c,mix(vec3(.03,.13,.06),vec3(.26,.56,.12),smoothstep(.35,.6,tone))*(.9+.2*vn(q*70.)),crown);                  // 거대한 나무(툰 두 단)
     float under=step(q.y,0.)*step(length(q/vec2(.135,.10)),1.);
@@ -1022,7 +1028,8 @@ function doorSpot(){
   };
   let best=null;
   for(const dy of [.22,.17,.27,.12,.31,.37,.44,.48,.52])for(const dx of [.16,.06,.26,-.04,.36,-.14,.46,-.24,.11,.21,.31,.01,.41]){
-    const [ew,et,eb]=SKY_EXT,pts=[[0,0],[-ew,et],[ew,et],[-ew,0],[ew,0],[-ew,eb],[ew,eb],[0,eb],[-ew-.07,eb],[ew+.07,eb]].map(([ax,ay])=>hits([dx+ax,dy+ay]));
+    // 섬은 아래가 좁아지는 실루엣을 따라 잰다
+    const [ew,et,eb]=SKY_EXT,pts=(SKY_MOTIF==='laputa'?[[0,0],[-ew*.75,et],[ew*.75,et],[0,et],[-ew,0],[ew,0],[-ew*.6,eb*.55],[ew*.6,eb*.55],[0,eb]]:[[0,0],[-ew,et],[ew,et],[-ew,0],[ew,0],[-ew,eb],[ew,eb],[0,eb],[-ew-.07,eb],[ew+.07,eb]]).map(([ax,ay])=>hits([dx+ax,dy+ay]));
     if(pts.some(p=>!p))continue;
     const ts=[...new Set(pts.flat())];
     if(ts.length>2||ts.some(([x,y,z])=>Math.hypot(x-CAM.ro[0],z-CAM.ro[2])<25))continue;
