@@ -14,10 +14,14 @@
    JOURNEY.progress()                 { map: 1..5, round: 1.., pendingJump: {monday, result, ending} | null }
    JOURNEY.markJumpSeen()             Promise. pendingJump를 본 것으로
    JOURNEY.onChange(fn)               기록이나 진행이 바뀌면 fn() 호출
+   JOURNEY.plan(key)                  그날의 책상 계획(블록 조각·주차장) 객체. 없으면 null. 모양은 desk.js가 정한다
+   JOURNEY.savePlan(key, obj)         그날 책상 계획 저장(이 기기 + db). savedAt을 채운다. 판정과는 무관. Promise
+   JOURNEY.refreshPlan(key)           db에서 그날 계획을 다시 읽는다(다른 기기에서 고친 것 받기). 바뀌었으면 true. Promise
 
    저장(문서 경로는 짝수 칸): data/users/<id>/journey/days/<YYYY-MM-DD> = {woke, line, savedAt}
                               data/users/<id>/journey/meta/since      = {day}     처음 연 날
                               data/users/<id>/journey/meta/jumpSeen   = {monday}  본 점프의 월요일
+                              data/users/<id>/journey/plans/<YYYY-MM-DD> = {b, park, savedAt}  책상 계획(이번 주 것만 읽는다)
    맵·회차는 저장하지 않고 열 때마다 하루 기록에서 다시 센다(기기 둘이 덮어써도 되돌아가지 않게).
    빈 날 3선도 쓰지 않고 읽을 때 계산한다. since 전의 빈 날은 3선으로 치지 않는다.
 */
@@ -38,6 +42,7 @@ const JOURNEY = (() => {
 
   let days = cacheGet("days", {});
   let since = cacheGet("since", null), jumpSeen = cacheGet("jumpSeen", null);
+  let plans = cacheGet("plans", {});   // 책상 계획: 날짜 → {b, park, savedAt}
   let prog = Object.assign({ map: 1, round: 1 }, cacheGet("progress", {}), { pendingJump: null });
   let db = null, base = "", gaveUp = false;
   const fns = [];
@@ -79,8 +84,21 @@ const JOURNEY = (() => {
     if (lastMon < from) from = lastMon;
     const keys = [];
     for (let k = from; k <= today; k = addDays(k, 1)) keys.push(k);
-    const got = await Promise.all(keys.map(k => dget(base + "days/" + k)));
+    // 책상 계획은 이번 주(월~일) 것만. 하루 기록과 한 번에 읽어 왕복을 늘리지 않는다
+    const pkeys = [];
+    for (let i = 0, m = mondayOf(today); i < 7; i++) pkeys.push(addDays(m, i));
+    const [got, pgot] = await Promise.all([Promise.all(keys.map(k => dget(base + "days/" + k))), Promise.all(pkeys.map(k => dget(base + "plans/" + k)))]);
     if (gaveUp) return;   // 5초를 넘겼으면 오프라인으로 남는다
+    // 계획은 나중에 저장한 쪽이 이긴다. 이 기기 것이 더 새로우면(오프라인에서 고침) 연결된 뒤 올린다
+    const push = [];
+    pkeys.forEach((k, i) => {
+      const local = plans[k], remote = pgot[i];
+      if (remote && (!local || (remote.savedAt || 0) >= (local.savedAt || 0))) plans[k] = remote;
+      else if (local && local.savedAt) push.push(k);
+    });
+    const oldest = addDays(today, -14);
+    for (const k of Object.keys(plans)) if (k < oldest) delete plans[k];
+    cacheSet("plans", plans);
     const cachedToday = days[today];
     days = {};
     keys.forEach((k, i) => { if (hasLine(got[i])) days[k] = got[i]; });
@@ -90,6 +108,7 @@ const JOURNEY = (() => {
     // 오프라인으로 넣어 둔 오늘 기록이 db에 없으면 올린다(지난 날은 건드리지 않는다)
     if (hasLine(cachedToday) && !days[today]) { days[today] = cachedToday; await dset(base + "days/" + today, cachedToday); }
     cacheSet("days", days); cacheSet("since", since); cacheSet("jumpSeen", jumpSeen);
+    for (const k of push) await dset(base + "plans/" + k, plans[k]);
   }
 
   /* 맵·회차: 처음 연 주부터 끝난 주를 차례로 세어 다시 만든다. 온라인일 때만(오프라인은 캐시 값) */
@@ -178,6 +197,21 @@ const JOURNEY = (() => {
     },
 
     onChange(fn) { fns.push(fn); },
+
+    plan(key) { return plans[key] || null; },
+    async savePlan(key, obj) {
+      const rec = Object.assign({}, obj, { savedAt: Date.now() });
+      plans[key] = rec;
+      cacheSet("plans", plans);
+      if (api.online) await dset(base + "plans/" + key, rec);
+    },
+    async refreshPlan(key) {
+      if (!api.online) return false;
+      const remote = await dget(base + "plans/" + key), local = plans[key];
+      if (!remote || (local && (local.savedAt || 0) >= (remote.savedAt || 0))) return false;
+      plans[key] = remote; cacheSet("plans", plans);
+      return true;
+    },
   };
 
   api.ready = withTimeout(connect(), 5000)

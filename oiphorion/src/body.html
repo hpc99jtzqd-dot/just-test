@@ -8,6 +8,7 @@
     <section class="signpost glass" aria-label="오늘의 갈림길">
       <label class="field" for="wake">고정 기상 <input id="wake" type="time" value="07:30"> <small>예시</small></label>
       <label class="field" for="woke">오늘 일어난 시각 <input id="woke" type="time"></label>
+      <div class="wake-nudge" id="wakeNudge" hidden><span>오늘 기록이 아직 없다. 안 적으면 3선으로 남는다.</span><button type="button" data-w="goal"></button><button type="button" data-w="now">방금 일어났다</button></div>
       <div class="days" id="days" role="group" aria-label="요일">
         <button type="button" data-d="1" aria-pressed="false">월</button><button type="button" data-d="2" aria-pressed="false">화</button><button type="button" data-d="3" aria-pressed="false">수</button><button type="button" data-d="4" aria-pressed="false">목</button><span class="sep" aria-hidden="true"></span><button type="button" data-d="5" aria-pressed="false">금</button><button type="button" data-d="6" aria-pressed="false">토</button><button type="button" data-d="0" aria-pressed="false">일</button>
       </div>
@@ -16,6 +17,7 @@
       </div>
       <button type="button" class="wk-pending" id="wkPending" hidden>지난 일요일 점프 보기</button>
       <output class="route" id="route" for="wake woke" data-line="1" aria-live="polite"></output>
+      <div class="now-strip" id="nowStrip" hidden></div>
     </section>
   </header>
 
@@ -127,6 +129,7 @@
     <h2 class="i-name" id="iName"></h2>
     <ul class="i-todo" id="iTodo"></ul>
     <details class="i-steps" id="iSteps"><summary></summary><ol></ol></details>
+    <section class="i-desk" id="iDesk" aria-label="이 칸의 조각" hidden></section>
     <button class="go-in" id="enter">두루마리 펼치기 ›</button>
     <p class="i-hint" id="iHint">다른 칸을 누르면 소년이 그리로 걸어간다. 같은 칸을 한 번 더 누르면 두루마리가 펼쳐진다.</p>
   </aside>
@@ -148,5 +151,54 @@
       <div id="pBody"></div>
     </div>
     <div class="rod b" aria-hidden="true"></div>
+  </article>
+</div>
+
+<div class="overlay" id="deskOv" hidden>
+  <article class="desk" role="dialog" aria-modal="true" aria-labelledby="dkTitle">
+    <header class="dk-head">
+      <div><p class="dk-meta" id="dkMeta"></p><h2 id="dkTitle"></h2></div>
+      <button type="button" class="dk-x" id="dkClose" aria-label="책상 닫기">✕</button>
+    </header>
+    <section class="dk-focus" aria-label="지금 조각">
+      <p class="dk-cap" id="dkCap"></p>
+      <p class="dk-cur" id="dkCur"></p>
+      <p class="dk-clock" id="dkClock" aria-live="off"></p>
+      <div class="dk-bar" aria-hidden="true"><i id="dkBar"></i></div>
+      <p class="dk-next" id="dkNext"></p>
+      <p class="dk-warn" id="dkWarn" hidden></p>
+      <p class="dk-toast" id="dkToast" role="status" hidden></p>
+      <div class="dk-acts">
+        <button type="button" class="dk-btn dk-go" id="dkDone">했음 ✓</button>
+        <button type="button" class="dk-btn" id="dkPlus5">+5분</button>
+        <button type="button" class="dk-btn" id="dkResync">지금부터 다시 맞추기</button>
+        <label class="dk-chime"><input type="checkbox" id="dkChime"> 끝날 때 소리</label>
+      </div>
+    </section>
+    <section class="dk-plan" aria-label="조각 나누기">
+      <div class="dk-plan-top">
+        <h3>조각</h3>
+        <label class="dk-start">시작 <input type="time" id="dkStart"></label>
+        <span class="dk-left" id="dkLeft"></span>
+      </div>
+      <ol class="dk-list" id="dkList"></ol>
+      <div class="dk-quick" id="dkQuick" role="group" aria-label="빠르게 나누기">
+        <button type="button" class="dk-btn" data-q="add">+ 조각</button>
+        <button type="button" class="dk-btn" data-q="rest">+ 쉼 10분</button>
+        <span class="dk-sep">남은 시간을</span>
+        <button type="button" class="dk-btn" data-q="n2">2등분</button>
+        <button type="button" class="dk-btn" data-q="n3">3등분</button>
+        <button type="button" class="dk-btn" data-q="n4">4등분</button>
+        <button type="button" class="dk-btn" data-q="50">50분 + 쉼 10</button>
+        <button type="button" class="dk-btn" data-q="25">25분 + 쉼 5</button>
+        <button type="button" class="dk-btn dk-quiet" data-q="clear">전부 지우기</button>
+      </div>
+    </section>
+    <section class="dk-park" aria-label="주차장">
+      <h3>주차장 <small>딴생각이 떠오르면 여기 한 줄 세워 두고 조각으로 돌아간다</small></h3>
+      <form id="dkParkForm"><input type="text" id="dkParkIn" maxlength="200" placeholder="예: 과제 공지 확인, 택배 조회" aria-label="주차장에 세울 생각"><button type="submit" class="dk-btn">세우기</button></form>
+      <p class="dk-park-hint" id="dkParkHint">지금 확인하지 않는다. 칸이 끝난 뒤에 한꺼번에 본다.</p>
+      <ul class="dk-park-list" id="dkParkList"></ul>
+    </section>
   </article>
 </div>

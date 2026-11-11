@@ -1172,7 +1172,7 @@ function buildOverlay(){
 function decorate(){
   const now=nowId();
   nodesEl.querySelectorAll(".node").forEach(n=>{ const id=n.dataset.id, b=byId(id);
-    n.classList.toggle("off",isOff(b)); n.classList.toggle("now",id===now); n.classList.toggle("sel",id===sel); n.classList.toggle("secret",id==="minimum"); n.classList.toggle("done",allDone(id)); });
+    n.classList.toggle("off",isOff(b)); n.classList.toggle("now",id===now); n.classList.toggle("sel",id===sel); n.classList.toggle("secret",id==="minimum"); n.classList.toggle("done",allDone(id)||DESK.allDone(id)); });
   stageEl.dataset.line=state.line;
 }
 /* ───── 난쟁이 ─────
@@ -1375,6 +1375,7 @@ function showInfo(){
   const steps=stepsOf(b,state.line), det=document.getElementById("iSteps"), done=doneSet(b.id);
   det.hidden=!steps.length; stepsSummary(steps.length,done.size);
   det.querySelector("ol").innerHTML=steps.map((t,i)=>'<li'+(done.has(i)?' class="done"':'')+'><label><input type="checkbox" data-i="'+i+'"'+(done.has(i)?' checked':'')+'><span>'+esc(t)+'</span></label></li>').join("");
+  DESK.sync();   // 이 칸의 조각(블록 쪼개기)
   const tm=trampMode(), breaks=isToday()&&JOURNEY.trampolineFor()==="breaks-today";
   const again=(b.id==="sunday"&&isToday()&&dayIdx===0)?" 산 정상 칸을 한 번 더 누르면 이번 주 점프를 본다.":" 같은 칸을 한 번 더 누르면 두루마리가 펼쳐진다.";
   const gone=" 트램펄린은 이번 주에 이미 잃어서 빈 등으로 걷는다.";
@@ -1421,9 +1422,16 @@ function refresh(rerender){
   state={W,line};
   dw.dataset.hat=hatLost()?"0":"1"; dw.dataset.tramp=trampMode();
   const r=document.getElementById("route"); r.dataset.line=line; r.innerHTML=signSVG+"<span>"+routeOf(line)[0]+" · "+routeOf(line)[1]+(wokeEl.value?"":" · 아직 안 적음")+"</span>";
+  // 오늘 기록이 없으면 한 번 눌러 적게 한다(기록이 빠진 날은 3선으로 남아 트램펄린이 깨진다)
+  const nudge=document.getElementById("wakeNudge"), need=isToday()&&!wokeEl.value&&document.activeElement!==wokeEl;
+  if(need) nudge.querySelector('[data-w="goal"]').textContent=hhmm(W)+"에 일어났다";
+  if(nudge.hidden===need){ nudge.hidden=!need; }
   buildOverlay(); decorate(); showInfo();
   if(rerender||changed) render();
 }
+document.getElementById("wakeNudge").addEventListener("click",e=>{ const b=e.target.closest("[data-w]"); if(!b||!isToday()) return;
+  const d=new Date(Date.now()+9*36e5); wokeEl.value=b.dataset.w==="now"?hhmm(d.getUTCHours()*60+d.getUTCMinutes()):hhmm(toMin(wakeEl.value)??450);
+  wokeEl.dispatchEvent(new Event("input",{bubbles:true})); });
 /* 오늘 요일을 보고 있을 때 '오늘 일어난 시각'을 고치면 오늘 기록으로 남긴다(타자 중엔 0.8초 기다렸다가) */
 let recT=0;
 [wakeEl,wokeEl].forEach(el=>el.addEventListener("input",()=>{ store.set("dw.wake",wakeEl.value); refresh(false);

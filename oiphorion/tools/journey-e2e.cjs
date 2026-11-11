@@ -264,6 +264,46 @@ test('V3 자세한 순서 체크는 그날 칸·길별로 남고, 다 하면 카
   assert.equal(db.writeCount(), 0, '개인 메모라 db에 쓰지 않음');
 }));
 
+test('V4 블록 쪼개기: 진행 중인 칸의 남은 시간을 나누고, db에 남고, 다 하면 카드에 ✓', () => session('2026-11-06T16:10', { fixture: 'keep' }, async (p, db) => {
+  assert.match(await p.locator('#nowStrip').innerText(), /지금 칸[\s\S]*오후 블록[\s\S]*1시간 50분/);
+  await p.locator('#iDesk .dk-open').click();
+  assert.equal(await p.locator('#deskOv').isVisible(), true);
+  await p.locator('#dkQuick [data-q="n2"]').click();
+  const rows = p.locator('#dkList .dk-row');
+  assert.equal(await rows.count(), 2);
+  assert.equal(await p.locator('#dkLeft').innerText(), '칸에 딱 맞음');
+  assert.equal(await rows.nth(0).locator('.dk-time').innerText(), '16:10–17:05', '지금부터 나눈다');
+  await rows.nth(0).locator('.dk-title').fill('미적 3.2 예제');
+  await rows.nth(0).locator('.dk-note').fill('7번부터 이어서');
+  await rows.nth(0).locator('[data-act="split"]').click();
+  assert.equal(await rows.count(), 3, '조각을 반으로');
+  assert.equal(await rows.nth(1).locator('.dk-title').inputValue(), '미적 3.2 예제');
+  assert.match(await p.locator('#dkCur').innerText(), /미적 3\.2 예제/, '지금 조각');
+  assert.match(await p.locator('#dkClock').innerText(), /^\d+:\d\d$/);
+  await p.fill('#dkParkIn', '과제 공지 확인'); await p.press('#dkParkIn', 'Enter');
+  assert.equal(await p.locator('#dkParkList li').count(), 1);
+  await until(() => db.get('plans/2026-11-06')?.b?.afternoon?.p?.length === 3 && db.get('plans/2026-11-06').park.length === 1, '계획이 db에 저장됨');
+  assert.equal(db.get('plans/2026-11-06').b.afternoon.s, 970, '시작은 지금(16:10)');
+  assert.equal(db.writeCount('days/2026-11-06'), 0, '판정 기록은 건드리지 않음');
+  for (let i = 0; i < 3; i++) await rows.nth(i).locator('.dk-chk input').check({ force: true });
+  await p.keyboard.press('Escape');
+  assert.equal(await p.locator('#deskOv').isVisible(), false);
+  assert.equal(await p.locator('.node.done[data-id="afternoon"]').count(), 1, '조각을 다 하면 ✓');
+  assert.match(await p.locator('#iDesk').innerText(), /조각 3\/3[\s\S]*주차장 1/);
+  await until(() => db.get('plans/2026-11-06').b.afternoon.p.every(x => x.d === 1), '했음이 저장됨');
+  await p.reload({ waitUntil: 'commit' });
+  await p.waitForFunction(() => window.__journeyReady === true);
+  assert.equal(await p.locator('#iDesk .dk-mini li.done').count(), 3, '다시 열어도 남아 있다');
+}));
+test('V4 오늘 기록이 없으면 단추 한 번으로 적는다', () => session('2026-11-09T09:00', { fixture: 'keep' }, async (p, db) => {
+  const nudge = p.locator('#wakeNudge');
+  assert.equal(await nudge.isVisible(), true);
+  await nudge.locator('[data-w="goal"]').click();
+  assert.equal(await p.inputValue('#woke'), '07:30');
+  await until(() => db.get('days/2026-11-09')?.woke === '07:30', '오늘 기록 저장');
+  assert.equal(await nudge.isVisible(), false);
+}));
+
 (async () => {
   let failed = 0;
   browser = await chromium.launch({ args });

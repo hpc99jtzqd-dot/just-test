@@ -38,10 +38,10 @@ leave = [int(x) for x in lm.group(1).split(",")] if lm else []
 if len(leave) != 4: errs.append("LEAVE_AT에서 월~목 출발 시각 4개를 읽지 못함")
 
 head = (read("head.html")
-        .replace("/*@NODES_CSS@*/", read("nodes.css") + "\n" + read("week.css"))
+        .replace("/*@NODES_CSS@*/", read("nodes.css") + "\n" + read("week.css") + "\n" + read("desk.css"))
         .replace("/*@SCROLL_CSS@*/", read("scroll.css"))
         .replace("/*@MOTION_CSS@*/", read("motion.css")))
-js = "\n".join(read(f) for f in ["data.js", "school.js", "routines.js", "journey.js", "scroll.js", "map-scenes.js", "map.js", "week.js"])
+js = "\n".join(read(f) for f in ["data.js", "school.js", "routines.js", "journey.js", "scroll.js", "desk.js", "map-scenes.js", "map.js", "week.js"])
 js = js.replace("__CPP__", json.dumps(cpp, ensure_ascii=False).replace("</", "<\\/"))
 js = js.replace("__ANCHORS__", json.dumps(anchors)).replace("__LEAVE__", json.dumps(leave))
 
