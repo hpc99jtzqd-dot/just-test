@@ -21,7 +21,8 @@ const DESK=(()=>{
   const nowFor=w=>{ let n=nowSec(); if(n+86400<w[1]*60) n+=86400; return n; };   // 자정을 넘는 칸(야영)
   const dur=m=>m>=60?Math.floor(m/60)+"시간"+(m%60?" "+(m%60)+"분":""):m+"분";
   const clock=s=>{ s=Math.max(0,Math.floor(s)); const h=Math.floor(s/3600), m=Math.floor(s%3600/60); return (h?h+":"+String(m).padStart(2,"0"):m)+":"+String(s%60).padStart(2,"0"); };
-  const nameOf=x=>x.t||(x.r?"쉼":"(이름 없는 조각)");
+  const nameOf=x=>x.t||(x.r?"쉼":"이름 없는 조각");
+  const round5=m=>Math.round(m/5)*5;   // 시각은 5분 단위로 맞춘다(19:52보다 19:50이 한눈에 읽힌다)
 
   /* 자료 */
   function clean(p){
@@ -51,7 +52,7 @@ const DESK=(()=>{
   /* 처음 나눌 때: 칸이 진행 중이면 지금부터, 아니면 칸 시작부터 */
   function ensure(b){
     let bp=cur.plan.b[b.id];
-    if(!bp){ const w=win(b); let s=w[0]; if(today()){ const n=Math.floor(nowFor(w)/60); if(n>w[0]&&n<w[1]) s=n; } bp=cur.plan.b[b.id]={s,p:[]}; }
+    if(!bp){ const w=win(b); let s=w[0]; if(today()){ const n=round5(nowFor(w)/60); if(n>w[0]&&n<w[1]) s=n; } bp=cur.plan.b[b.id]={s,p:[]}; }
     return bp;
   }
   function stat(){ let n=0,k=0,m=0; for(const bp of Object.values(cur.plan.b)) for(const x of bp.p){ if(x.r) continue; n++; if(x.d){ k++; m+=x.m; } } return {n,k,m}; }
@@ -96,77 +97,91 @@ const DESK=(()=>{
 
   /* ── 책상(집중 화면) ── */
   const block=()=>byId(dk.id);
+  /* 한 줄 = 평소엔 시간표처럼 읽히는 요약(했음 · 시작 시각 · 할 일 · 길이). 누른 줄만 고치는 칸이 펼쳐진다(한 번에 하나).
+     입력칸·단추를 줄마다 늘어놓으면 표가 아니라 양식으로 보여 한눈에 안 읽힌다(민 피드백 2026-11-11). */
+  let openRow=-1;
   function rowHTML(x,i){
-    return '<li class="dk-row'+(x.d?" done":"")+(x.r?" rest":"")+'" data-i="'+i+'">'+
-      '<span class="dk-time"></span>'+
-      '<label class="dk-minw"><input class="dk-min" type="number" inputmode="numeric" min="1" max="600" step="5" value="'+x.m+'" aria-label="'+(i+1)+'번 조각 길이(분)"><span>분</span></label>'+
-      '<input class="dk-title" type="text" maxlength="120" value="'+esc(x.t)+'" placeholder="'+(x.r?"쉼":"무엇을 할까 (예: 미적 3.2 예제 4~9)")+'" aria-label="'+(i+1)+'번 조각 할 일">'+
-      '<span class="dk-tools"><label class="dk-chk" title="했음"><input type="checkbox"'+(x.d?" checked":"")+' aria-label="'+(i+1)+'번 조각 했음"><i aria-hidden="true">✓</i></label>'+
-      '<button type="button" data-act="split" title="반으로 쪼개기" aria-label="'+(i+1)+'번 조각을 반으로 쪼개기">÷</button>'+
-      '<button type="button" data-act="up" title="위로" aria-label="'+(i+1)+'번 조각을 위로"'+(i?"":" disabled")+'>↑</button>'+
-      '<button type="button" data-act="del" title="지우기" aria-label="'+(i+1)+'번 조각 지우기">×</button></span>'+
-      '<textarea class="dk-note" rows="1" maxlength="2000" placeholder="공부 사항 · 메모 (쪽수, 막힌 곳, 다음에 이어갈 곳)" aria-label="'+(i+1)+'번 조각 메모">'+esc(x.n)+'</textarea></li>';
+    const open=i===openRow, n=i+1;
+    return '<li class="dk-row'+(x.d?" done":"")+(x.r?" rest":"")+(open?" open":"")+'" data-i="'+i+'">'+
+      '<label class="dk-chk"><input type="checkbox"'+(x.d?" checked":"")+' aria-label="'+n+'번 조각 했음"><i aria-hidden="true">✓</i></label>'+
+      '<button type="button" class="dk-sum" aria-expanded="'+open+'"><span class="dk-time"></span><span class="dk-what"><span class="dk-name"></span><span class="dk-memo"></span></span><span class="dk-len"></span></button>'+
+      (open?'<div class="dk-edit">'+
+        '<div class="dk-edit-top"><input class="dk-title" type="text" maxlength="120" value="'+esc(x.t)+'" placeholder="'+(x.r?"쉼":"무엇을 할까")+'" aria-label="'+n+'번 조각 할 일" enterkeyhint="next">'+
+        '<label class="dk-minw"><input class="dk-min" type="number" inputmode="numeric" min="1" max="600" step="5" value="'+x.m+'" aria-label="'+n+'번 조각 길이(분)"><span>분</span></label></div>'+
+        '<textarea class="dk-note" rows="1" maxlength="2000" placeholder="메모 (쪽수, 막힌 곳, 다음에 이어갈 곳)" aria-label="'+n+'번 조각 메모">'+esc(x.n)+'</textarea>'+
+        '<div class="dk-tools"><button type="button" data-act="split">반으로 쪼개기</button><button type="button" data-act="up"'+(i?"":" disabled")+'>위로</button>'+
+        '<button type="button" data-act="del">지우기</button><button type="button" data-act="close" class="dk-ok">됐음</button></div></div>':"")+
+      '</li>';
   }
   const grow=ta=>{ ta.style.height="auto"; ta.style.height=Math.min(ta.scrollHeight+2,220)+"px"; };
-  function renderList(focus){
+  /* open: 펼칠 줄(없으면 다 접는다). 펼친 줄의 할 일 칸에 커서를 둔다 */
+  function renderList(open){
     const bp=cur.plan.b[dk.id], p=bp?bp.p:[];
-    list.innerHTML=p.map(rowHTML).join("")||'<li class="dk-empty">아직 조각이 없다. 아래 단추로 남은 시간을 나누거나 조각을 하나씩 더한다.</li>';
+    openRow=open!=null&&open>=0&&open<p.length?open:-1;
+    list.innerHTML=p.map(rowHTML).join(""); list.hidden=!p.length;
     list.querySelectorAll(".dk-note").forEach(grow);
-    if(focus!=null) list.children[focus]?.querySelector(".dk-title")?.focus({preventScroll:false});
     paint();
+    if(openRow>=0){ const li=list.children[openRow]; li.querySelector(".dk-title").focus({preventScroll:true}); li.scrollIntoView({block:"nearest"}); }
   }
   function renderPark(){
     const pk=cur.plan.park;
     parkList.innerHTML=pk.map((x,i)=>'<li class="'+(x.d?"done":"")+'"><label><input type="checkbox" data-i="'+i+'"'+(x.d?" checked":"")+'><span>'+esc(x.t)+'</span></label><button type="button" data-del="'+i+'" aria-label="'+esc(x.t)+' 지우기">×</button></li>').join("");
-    $("dkParkHint").hidden=pk.length>0;
   }
   /* 글자만 바꾼다(목록을 다시 만들지 않는다): 시각 표, 남은 시간, 지금 조각 */
   const put=(el,t)=>{ if(el.textContent!==t) el.textContent=t; };   // 같은 글자는 다시 쓰지 않는다(초마다 불린다)
   function paint(){
     if(!dk) return;
     const b=block(), L=layout(b), a=active(L), isT=today(), n=isT?nowFor(L.w):0, st=stat();
-    [...list.children].forEach((li,i)=>{ const r=L.rows[i]; if(!r) return;
-      put(li.querySelector(".dk-time"),hhmm(r.t0)+"–"+hhmm(r.t1));
+    [...list.children].forEach((li,i)=>{ const r=L.rows[i], x=L.p[i]; if(!r) return;
+      put(li.querySelector(".dk-time"),hhmm(r.t0));
+      const nm=li.querySelector(".dk-name"); put(nm,nameOf(x)); nm.classList.toggle("blank",!x.t&&!x.r);
+      put(li.querySelector(".dk-memo"),x.n.split("\n")[0]);
+      put(li.querySelector(".dk-len"),i===a?Math.ceil((r.t1*60-n)/60)+"분 남음":dur(x.m));
       li.classList.toggle("now",i===a); li.classList.toggle("over",r.t1>L.w[1]); });
-    const left=$("dkLeft"); left.classList.toggle("over",L.left<0);
-    put(left,!L.p.length?"칸 "+dur(L.w[1]-L.w[0]):L.left>0?"남은 시간 "+dur(L.left):L.left===0?"칸에 딱 맞음":dur(-L.left)+" 넘침");
-    const startEl=$("dkStart"); if(document.activeElement!==startEl) startEl.value=hhmm(L.s);
-    document.querySelectorAll("#dkQuick [data-q^='n'],#dkQuick [data-q='50'],#dkQuick [data-q='25']").forEach(q=>q.disabled=(L.p.length?L.left:L.w[1]-freshStart(b))<10);
-    put($("dkMeta"),DAY_NAMES[dayIdx]+"요일 · "+hhmm(L.w[0])+" – "+hhmm(L.w[1])+(st.n?" · 오늘 조각 "+st.k+"/"+st.n+(st.m?" · 한 시간 "+dur(st.m):""):""));
+    // 시간표의 마지막 줄: 칸이 언제 끝나는지, 비었는지 넘쳤는지
+    const free=L.p.length?L.left:L.w[1]-freshStart(b), tail=$("dkTail"); tail.classList.toggle("over",L.left<0);
+    put(tail,!L.p.length?"아직 조각이 없다. 아래에서 "+dur(free)+"을 나누거나 하나씩 더한다."
+      :L.left>0?hhmm(L.end)+"부터 "+dur(L.left)+" 비어 있음 · 칸 끝 "+hhmm(L.w[1])
+      :L.left===0?hhmm(L.w[1])+" 칸 끝":hhmm(L.end)+" 끝 · 칸 끝 "+hhmm(L.w[1])+"을 "+dur(-L.left)+" 넘김");
+    const startEl=$("dkStart"); if(document.activeElement!==startEl) startEl.value=hhmm(L.p.length?L.s:freshStart(b));
+    $("dkFill").hidden=free<10; put($("dkFillCap"),(L.p.length?"남은 ":"")+dur(Math.max(0,free))+"을");
+    put($("dkMeta"),DAY_NAMES[dayIdx]+"요일 "+hhmm(L.w[0])+" – "+hhmm(L.w[1])+(st.n?" · 오늘 한 조각 "+st.k+"/"+st.n+(st.m?" ("+dur(st.m)+")":""):""));
     // 지금 조각
     const cap=$("dkCap"), curEl=$("dkCur"), clk=$("dkClock"), bar=$("dkBar"), nx=$("dkNext"), warn=$("dkWarn");
     let frac=0, canDone=false; warn.hidden=true;
-    if(!L.p.length){ cap.textContent=isT?"이 칸":"계획"; curEl.textContent="이 칸을 내 단위로 나눠 보자"; clk.textContent=dur(L.w[1]-L.w[0]); nx.textContent="조각마다 할 일을 한 줄씩 적으면, 그 조각 동안은 그것만 한다."; }
+    if(!L.p.length){ cap.textContent=isT?"이 칸":"계획"; curEl.textContent="이 칸을 내 단위로 나눠 보자"; clk.textContent=dur(Math.max(0,free)); nx.textContent="조각마다 할 일을 한 줄씩 적으면, 그 조각 동안은 그것만 한다."; }
     else if(!isT){ cap.textContent="계획"; curEl.textContent=DAY_NAMES[dayIdx]+"요일 계획을 세우는 중"; clk.textContent=dur(L.end-L.s); nx.textContent="그날이 되면 여기에 지금 조각과 남은 시간이 나온다."; }
     else if(a>=0){ const r=L.rows[a], x=L.p[a]; cap.textContent=x.r?"지금 · 쉼":"지금"; curEl.textContent=nameOf(x);
       clk.textContent=clock(r.t1*60-n); frac=(n-r.t0*60)/((r.t1-r.t0)*60); canDone=true;
-      const y=L.p[a+1]; nx.textContent=y?"다음 · "+hhmm(L.rows[a+1].t0)+" "+nameOf(y)+" "+y.m+"분":"마지막 조각이다. 끝나면 칸 끝까지 "+dur(Math.max(0,L.w[1]-r.t1))+" 남는다.";
-      const late=L.p.slice(0,a).filter(q=>!q.d&&!q.r).length; if(late){ warn.hidden=false; warn.textContent="앞 조각 "+late+"개가 아직 안 끝났다. 밀렸으면 '지금부터 다시 맞추기'."; } }
+      const y=L.p[a+1]; nx.textContent=hhmm(r.t1)+"까지"+(y?" · 다음은 "+nameOf(y)+" "+dur(y.m):" · 마지막 조각");
+      const late=L.p.slice(0,a).filter(q=>!q.d&&!q.r).length; if(late){ warn.hidden=false; warn.textContent="앞 조각 "+late+"개가 아직 안 끝났다. 밀렸으면 '지금부터 다시'."; } }
     else if(n<L.s*60){ cap.textContent="곧 시작"; curEl.textContent=nameOf(L.p[0]); clk.textContent=clock(L.s*60-n); nx.textContent=hhmm(L.s)+"에 첫 조각이 시작된다."; }
     else { const undone=L.p.filter(q=>!q.d&&!q.r).length; cap.textContent="조각 끝"; curEl.textContent=undone?"못 끝낸 조각 "+undone+"개":"이 칸의 조각을 다 했다";
-      clk.textContent=n<L.w[1]*60?clock(L.w[1]*60-n):"0:00"; nx.textContent=n<L.w[1]*60?"칸 끝까지 남은 시간이다. 조각을 더하거나 '지금부터 다시 맞추기'.":"칸이 끝났다. 다음 칸으로."; canDone=undone>0; }
+      clk.textContent=n<L.w[1]*60?clock(L.w[1]*60-n):"0:00"; nx.textContent=n<L.w[1]*60?"칸 끝까지 남은 시간이다. 조각을 더하거나 '지금부터 다시'.":"칸이 끝났다. 다음 칸으로."; canDone=undone>0; }
+    clk.classList.toggle("words",!/^[\d:]+$/.test(clk.textContent));   // 숫자 시계가 아닌 글(3시간 10분)은 작게
+    document.querySelector(".dk-acts").hidden=!L.p.length;
     bar.style.transform="scaleX("+Math.max(0,Math.min(1,frac)).toFixed(4)+")";
     $("dkDone").disabled=!canDone; $("dkPlus5").disabled=a<0; $("dkResync").disabled=!isT||!L.p.some(q=>!q.d);
     const title=isT&&a>=0?clock(L.rows[a].t1*60-n)+" · "+nameOf(L.p[a])+" · 오이포리온":"오이포리온"; if(document.title!==title) document.title=title;
   }
-  const freshStart=b=>{ const w=win(b); if(today()){ const n=Math.floor(nowFor(w)/60); if(n>w[0]&&n<w[1]) return n; } return w[0]; };
+  const freshStart=b=>{ const w=win(b); if(today()){ const n=round5(nowFor(w)/60); if(n>w[0]&&n<w[1]) return n; } return w[0]; };
 
-  function openDesk(id){
+  function openDesk(id,quiet){
     const b=byId(id); if(!win(b)) return;
-    load(selectedDate()); dk={date:cur.date,id}; clearArm=0;
+    load(selectedDate()); dk={date:cur.date,id}; clearArm=0; store.set("oi.desk","1");
     $("dkTitle").textContent=b.name; $("dkChime").checked=store.get("oi.chime")!=="0";
-    ov.hidden=false; ov.scrollTop=0; renderList(); renderPark(); prime(); lockScreen();
+    ov.hidden=false; ov.scrollTop=0; renderList(); renderPark(); if(!quiet) prime(); lockScreen();
     $("dkClose").focus({preventScroll:true});
   }
   function closeDesk(){
-    if(!dk) return; flush(); dk=null; ov.hidden=true; unlock(); document.title="오이포리온";
+    if(!dk) return; flush(); dk=null; ov.hidden=true; unlock(); document.title="오이포리온"; store.set("oi.desk","0");
     sync(); decorate(); document.querySelector("#iDesk .dk-open")?.focus({preventScroll:true});
   }
   $("dkClose").addEventListener("click",closeDesk);
-  ov.addEventListener("click",e=>{ if(e.target===ov) closeDesk(); });
+  ov.addEventListener("click",e=>{ if(e.target===ov) closeDesk(); else prime(); });
   document.addEventListener("keydown",e=>{ if(dk&&e.key==="Escape") closeDesk(); });
 
-  /* 조각 고치기: 타자 중에는 목록을 다시 만들지 않는다 */
+  /* 조각 고치기: 타자 중에는 목록을 다시 만들지 않는다(요약 글자만 따라 바뀐다) */
   list.addEventListener("input",e=>{
     const li=e.target.closest(".dk-row"); if(!li) return; const x=cur.plan.b[dk.id].p[+li.dataset.i]; if(!x) return;
     if(e.target.classList.contains("dk-min")){ const v=Math.round(+e.target.value); if(Number.isFinite(v)&&v>=1) x.m=Math.min(600,v); }
@@ -180,20 +195,25 @@ const DESK=(()=>{
     cur.plan.b[dk.id].p[+li.dataset.i].d=e.target.checked?1:0; li.classList.toggle("done",e.target.checked); dirty(); paint();
   });
   list.addEventListener("click",e=>{
-    const btn=e.target.closest("[data-act]"), li=btn&&btn.closest(".dk-row"); if(!li) return;
-    const p=cur.plan.b[dk.id].p, i=+li.dataset.i, x=p[i]; let focus=null;
-    if(btn.dataset.act==="split"){ if(x.m<2) return; const a=x.m>=10?Math.max(5,Math.round(x.m/10)*5):Math.ceil(x.m/2); p.splice(i,1,{...x,m:a},{...x,m:x.m-a,n:"",d:0}); focus=i+1; }
-    else if(btn.dataset.act==="up"){ if(!i) return; [p[i-1],p[i]]=[p[i],p[i-1]]; focus=i-1; }
-    else if(btn.dataset.act==="del"){ p.splice(i,1); if(!p.length) delete cur.plan.b[dk.id]; }
-    dirty(); renderList(focus);
+    const li=e.target.closest(".dk-row"); if(!li) return; const i=+li.dataset.i;
+    if(e.target.closest(".dk-sum")){ renderList(i===openRow?-1:i); return; }   // 줄을 누르면 펼치고, 다시 누르면 접는다
+    const btn=e.target.closest("[data-act]"); if(!btn) return;
+    const p=cur.plan.b[dk.id].p, x=p[i], act=btn.dataset.act; let open=-1;
+    if(act==="split"){ if(x.m<2) return; const a=x.m>=10?Math.max(5,round5(x.m/2)):Math.ceil(x.m/2); p.splice(i,1,{...x,m:a},{...x,m:x.m-a,n:"",d:0}); open=i+1; }
+    else if(act==="up"){ if(!i) return; [p[i-1],p[i]]=[p[i],p[i-1]]; open=i-1; }
+    else if(act==="del"){ p.splice(i,1); if(!p.length) delete cur.plan.b[dk.id]; }
+    else if(act!=="close") return;
+    dirty(); renderList(open);
+  });
+  list.addEventListener("keydown",e=>{   // 할 일 칸에서 Enter: 다음 이름 없는 조각으로 넘어간다(없으면 접는다)
+    if(e.key!=="Enter"||e.isComposing||!e.target.classList.contains("dk-title")) return; e.preventDefault();
+    const p=cur.plan.b[dk.id].p, i=+e.target.closest(".dk-row").dataset.i; renderList(p.findIndex((x,k)=>k>i&&!x.t&&!x.r));
   });
   $("dkStart").addEventListener("input",e=>{ const v=toMin(e.target.value); if(v==null) return; const b=block(), w=win(b);
     ensure(b).s=w[1]>1440&&v<w[0]-720?v+1440:v; dirty(); paint(); });
-  /* 빠르게 나누기: 남은 시간을 채운다 */
+  /* 조각 더하기 · 빠르게 나누기(남은 시간을 채운다). 새 조각의 할 일 칸을 바로 펼친다 */
   $("dkQuick").addEventListener("click",e=>{
     const q=e.target.closest("[data-q]"); if(!q) return; const b=block(), kind=q.dataset.q;
-    if(kind==="clear"){ if(clearArm&&Date.now()-clearArm<4000){ delete cur.plan.b[dk.id]; clearArm=0; q.textContent="전부 지우기"; dirty(); renderList(); }
-      else { clearArm=Date.now(); q.textContent="정말 지울까? 한 번 더"; setTimeout(()=>{ if(clearArm&&Date.now()-clearArm>=3900){ clearArm=0; q.textContent="전부 지우기"; } },4000); } return; }
     const bp=ensure(b), L=layout(b), at0=bp.p.length; let left=L.left;
     const push=(m,r)=>bp.p.push({m,t:r?"쉼":"",n:"",d:0,r:r?1:0});
     if(kind==="add") push(left>=5&&left<25?left:25);
@@ -201,20 +221,23 @@ const DESK=(()=>{
     else if(/^n\d$/.test(kind)){ const k=+kind[1]; if(left<10) return; const base=Math.max(5,Math.floor(left/k/5)*5); for(let i=0;i<k-1;i++) push(base); push(Math.max(1,left-base*(k-1))); }
     else { const work=+kind, rest=work>=50?10:5, tail=work>=50?15:10; if(left<10) return;   // 공부 work분 + 쉼 rest분을 되풀이
       while(left>=10){ let m=Math.min(work,left); if(left-m>0&&left-m<tail) m=left; push(m); left-=m; if(left>=rest+tail){ push(rest,1); left-=rest; } } }
-    dirty(); renderList(at0<bp.p.length?at0:null);
+    dirty(); renderList(bp.p.findIndex((x,i)=>i>=at0&&!x.r));
   });
+  $("dkClear").addEventListener("click",e=>{ const q=e.currentTarget;   // 두 번 눌러야 지운다
+    if(clearArm&&Date.now()-clearArm<4000){ delete cur.plan.b[dk.id]; clearArm=0; q.textContent="조각 전부 지우기"; dirty(); renderList(); }
+    else { clearArm=Date.now(); q.textContent="정말 지울까? 한 번 더 누르기"; setTimeout(()=>{ if(clearArm&&Date.now()-clearArm>=3900){ clearArm=0; q.textContent="조각 전부 지우기"; } },4000); } });
   /* 지금 조각 단추 */
   $("dkDone").addEventListener("click",()=>{
     const b=block(), L=layout(b), a=active(L), p=L.p;
-    if(a>=0){ const x=p[a]; x.d=1;   // 일찍 끝냈으면 실제 걸린 시간으로 줄여, 다음 조각이 지금 시작되게 한다
-      const el=Math.max(1,Math.ceil((nowFor(L.w)-L.rows[a].t0*60)/60)); if(el<x.m) x.m=el; }
+    if(a>=0){ const x=p[a]; x.d=1;   // 일찍 끝냈으면 걸린 시간(5분 단위로 올림)으로 줄여, 다음 조각이 곧 시작되게 한다
+      const el=Math.max(5,Math.ceil((nowFor(L.w)-L.rows[a].t0*60)/300)*5); if(el<x.m) x.m=el; }
     else { const x=p.find(q=>!q.d&&!q.r); if(x) x.d=1; }
     dirty(); renderList();
   });
   $("dkPlus5").addEventListener("click",()=>{ const b=block(), L=layout(b), a=active(L); if(a<0) return; L.p[a].m+=5; dirty(); renderList(); });
   $("dkResync").addEventListener("click",()=>{   // 아직 안 한 첫 조각이 지금 시작되게 시작 시각을 민다
     const b=block(), L=layout(b), k=L.p.findIndex(q=>!q.d); if(k<0||!today()) return;
-    cur.plan.b[dk.id].s=Math.floor(nowFor(L.w)/60)-L.p.slice(0,k).reduce((s,q)=>s+q.m,0); dirty(); paint();
+    cur.plan.b[dk.id].s=round5(nowFor(L.w)/60)-L.p.slice(0,k).reduce((s,q)=>s+q.m,0); dirty(); paint();
   });
   $("dkChime").addEventListener("change",e=>{ store.set("oi.chime",e.target.checked?"1":"0"); if(e.target.checked){ prime(); beep(); } });
   /* 주차장 */
@@ -262,6 +285,9 @@ const DESK=(()=>{
   return {
     sync,
     open:openDesk,
+    /* 책상을 편 채 페이지를 떠났고 지금 조각이 진행 중이면, 다시 열었을 때 책상부터 보인다 */
+    restore(){ if(store.get("oi.desk")!=="1"||dk) return; load(selectedDate()); const np=sceneMode==="day"&&nowPiece();
+      if(np) openDesk(np.key.split("|")[0],true); else store.set("oi.desk","0"); },
     /* 칸의 조각(쉼 빼고)을 다 했는가: 일정 카드의 ✓ */
     allDone(id){ load(selectedDate()); const bp=cur.plan.b[id]; if(!bp) return false; const work=bp.p.filter(x=>!x.r); return work.length>0&&work.every(x=>x.d); },
   };

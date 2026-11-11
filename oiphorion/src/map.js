@@ -1485,7 +1485,7 @@ function layoutAll(){
   };
   document.addEventListener("visibilitychange",updateCalendar);
   setInterval(()=>{ updateCalendar(); decorate(); if(!walking) showInfo(); },60000);
-  JOURNEY.ready.then(()=>{ window.__boot.dbMs=performance.now(); bootHold=false; applyJourney(); if(state.line===3&&!location.hash)at=sel='minimum'; layoutAll(); JOURNEY.onChange(applyJourney);
+  JOURNEY.ready.then(()=>{ window.__boot.dbMs=performance.now(); bootHold=false; applyJourney(); if(state.line===3&&!location.hash)at=sel='minimum'; layoutAll(); DESK.restore(); JOURNEY.onChange(applyJourney);
     const ready=()=>{ if(gl&&!raster.done){ requestAnimationFrame(ready); return; } window.__journeyReady=true; }; ready();
   }).catch(e=>console.error(e));  // db 처리와 첫 렌더가 끝나면 시험용 준비 신호
 })();

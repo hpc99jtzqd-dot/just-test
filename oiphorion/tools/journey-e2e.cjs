@@ -271,13 +271,21 @@ test('V4 블록 쪼개기: 진행 중인 칸의 남은 시간을 나누고, db�
   await p.locator('#dkQuick [data-q="n2"]').click();
   const rows = p.locator('#dkList .dk-row');
   assert.equal(await rows.count(), 2);
-  assert.equal(await p.locator('#dkLeft').innerText(), '칸에 딱 맞음');
-  assert.equal(await rows.nth(0).locator('.dk-time').innerText(), '16:10–17:05', '지금부터 나눈다');
+  assert.equal(await p.locator('#dkTail').innerText(), '18:00 칸 끝');
+  assert.equal(await rows.nth(0).locator('.dk-time').innerText(), '16:10', '지금부터 나눈다');
+  assert.equal(await rows.nth(1).locator('.dk-time').innerText(), '17:05');
+  assert.equal(await p.locator('#dkList .dk-edit').count(), 1, '고치는 칸은 한 줄에만');
+  assert.equal(await rows.nth(0).locator('.dk-title').evaluate(e => e === document.activeElement), true, '새 조각의 할 일 칸에 커서');
   await rows.nth(0).locator('.dk-title').fill('미적 3.2 예제');
   await rows.nth(0).locator('.dk-note').fill('7번부터 이어서');
   await rows.nth(0).locator('[data-act="split"]').click();
   assert.equal(await rows.count(), 3, '조각을 반으로');
   assert.equal(await rows.nth(1).locator('.dk-title').inputValue(), '미적 3.2 예제');
+  await rows.nth(1).locator('.dk-title').press('Enter');
+  assert.equal(await rows.nth(2).locator('.dk-edit').count(), 1, 'Enter로 다음 이름 없는 조각');
+  await rows.nth(2).locator('.dk-title').fill('공수1 복습'); await rows.nth(2).locator('.dk-title').press('Enter');
+  assert.equal(await p.locator('#dkList .dk-edit').count(), 0, '다 적으면 접힌다');
+  assert.equal(await rows.nth(0).locator('.dk-memo').innerText(), '7번부터 이어서', '메모 첫 줄이 요약에 보인다');
   assert.match(await p.locator('#dkCur').innerText(), /미적 3\.2 예제/, '지금 조각');
   assert.match(await p.locator('#dkClock').innerText(), /^\d+:\d\d$/);
   await p.fill('#dkParkIn', '과제 공지 확인'); await p.press('#dkParkIn', 'Enter');
@@ -294,6 +302,11 @@ test('V4 블록 쪼개기: 진행 중인 칸의 남은 시간을 나누고, db�
   await p.reload({ waitUntil: 'commit' });
   await p.waitForFunction(() => window.__journeyReady === true);
   assert.equal(await p.locator('#iDesk .dk-mini li.done').count(), 3, '다시 열어도 남아 있다');
+  assert.equal(await p.locator('#deskOv').isVisible(), false, '닫고 떠났으면 닫힌 채');
+  await p.locator('#nowStrip button').click();
+  await p.reload({ waitUntil: 'commit' });
+  await p.waitForFunction(() => window.__journeyReady === true);
+  assert.equal(await p.locator('#deskOv').isVisible(), true, '책상을 편 채 떠났고 조각이 진행 중이면 책상부터');
 }));
 test('V4 오늘 기록이 없으면 단추 한 번으로 적는다', () => session('2026-11-09T09:00', { fixture: 'keep' }, async (p, db) => {
   const nudge = p.locator('#wakeNudge');

@@ -3,7 +3,7 @@
 <div class="world">
   <header class="head">
     <span class="eyebrow">공부 운영체제 v2 · 한 주 여정</span>
-    <h1>오이포리온</h1>
+    <h1>Euphorion</h1>
     <p class="lead">하루는 햇살과 들꽃 사이의 산책, 한 주는 정상으로 이어지는 등정. 장소를 눌러 걸어가고, 한 번 더 누르면 두루마리가 펼쳐진다.</p>
     <section class="signpost glass" aria-label="오늘의 갈림길">
       <label class="field" for="wake">고정 기상 <input id="wake" type="time" value="07:30"> <small>예시</small></label>
@@ -157,7 +157,7 @@
 <div class="overlay" id="deskOv" hidden>
   <article class="desk" role="dialog" aria-modal="true" aria-labelledby="dkTitle">
     <header class="dk-head">
-      <div><p class="dk-meta" id="dkMeta"></p><h2 id="dkTitle"></h2></div>
+      <div><h2 id="dkTitle"></h2><p class="dk-meta" id="dkMeta"></p></div>
       <button type="button" class="dk-x" id="dkClose" aria-label="책상 닫기">✕</button>
     </header>
     <section class="dk-focus" aria-label="지금 조각">
@@ -171,34 +171,39 @@
       <div class="dk-acts">
         <button type="button" class="dk-btn dk-go" id="dkDone">했음 ✓</button>
         <button type="button" class="dk-btn" id="dkPlus5">+5분</button>
-        <button type="button" class="dk-btn" id="dkResync">지금부터 다시 맞추기</button>
-        <label class="dk-chime"><input type="checkbox" id="dkChime"> 끝날 때 소리</label>
+        <button type="button" class="dk-btn" id="dkResync" title="아직 안 한 첫 조각이 지금 시작되게 시간표를 민다">지금부터 다시</button>
       </div>
     </section>
-    <section class="dk-plan" aria-label="조각 나누기">
+    <section class="dk-plan" aria-label="조각 시간표">
       <div class="dk-plan-top">
-        <h3>조각</h3>
+        <h3>시간표</h3>
         <label class="dk-start">시작 <input type="time" id="dkStart"></label>
-        <span class="dk-left" id="dkLeft"></span>
       </div>
-      <ol class="dk-list" id="dkList"></ol>
-      <div class="dk-quick" id="dkQuick" role="group" aria-label="빠르게 나누기">
+      <div class="dk-sheet">
+        <ol class="dk-list" id="dkList"></ol>
+        <p class="dk-tail" id="dkTail"></p>
+      </div>
+      <div class="dk-quick" id="dkQuick" role="group" aria-label="조각 더하기">
         <button type="button" class="dk-btn" data-q="add">+ 조각</button>
         <button type="button" class="dk-btn" data-q="rest">+ 쉼 10분</button>
-        <span class="dk-sep">남은 시간을</span>
-        <button type="button" class="dk-btn" data-q="n2">2등분</button>
-        <button type="button" class="dk-btn" data-q="n3">3등분</button>
-        <button type="button" class="dk-btn" data-q="n4">4등분</button>
-        <button type="button" class="dk-btn" data-q="50">50분 + 쉼 10</button>
-        <button type="button" class="dk-btn" data-q="25">25분 + 쉼 5</button>
-        <button type="button" class="dk-btn dk-quiet" data-q="clear">전부 지우기</button>
+        <span class="dk-fill" id="dkFill">
+          <span class="dk-sep" id="dkFillCap"></span>
+          <button type="button" class="dk-btn" data-q="n2">2등분</button>
+          <button type="button" class="dk-btn" data-q="n3">3등분</button>
+          <button type="button" class="dk-btn" data-q="n4">4등분</button>
+          <button type="button" class="dk-btn" data-q="50">50분+쉼</button>
+          <button type="button" class="dk-btn" data-q="25">25분+쉼</button>
+        </span>
       </div>
     </section>
     <section class="dk-park" aria-label="주차장">
-      <h3>주차장 <small>딴생각이 떠오르면 여기 한 줄 세워 두고 조각으로 돌아간다</small></h3>
-      <form id="dkParkForm"><input type="text" id="dkParkIn" maxlength="200" placeholder="예: 과제 공지 확인, 택배 조회" aria-label="주차장에 세울 생각"><button type="submit" class="dk-btn">세우기</button></form>
-      <p class="dk-park-hint" id="dkParkHint">지금 확인하지 않는다. 칸이 끝난 뒤에 한꺼번에 본다.</p>
+      <h3>주차장 <small>딴생각은 한 줄 세워 두고 조각으로 돌아간다</small></h3>
+      <form id="dkParkForm"><input type="text" id="dkParkIn" maxlength="200" placeholder="예: 과제 공지 확인" aria-label="주차장에 세울 생각"><button type="submit" class="dk-btn">세우기</button></form>
       <ul class="dk-park-list" id="dkParkList"></ul>
     </section>
+    <footer class="dk-foot">
+      <label class="dk-chime"><input type="checkbox" id="dkChime"> 조각이 끝날 때 소리</label>
+      <button type="button" class="dk-link" id="dkClear">조각 전부 지우기</button>
+    </footer>
   </article>
 </div>
