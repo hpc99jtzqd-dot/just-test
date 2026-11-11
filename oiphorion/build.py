@@ -38,7 +38,7 @@ leave = [int(x) for x in lm.group(1).split(",")] if lm else []
 if len(leave) != 4: errs.append("LEAVE_AT에서 월~목 출발 시각 4개를 읽지 못함")
 
 head = (read("head.html")
-        .replace("/*@NODES_CSS@*/", read("nodes.css") + "\n" + read("week.css") + "\n" + read("desk.css"))
+        .replace("/*@NODES_CSS@*/", read("font-hand.css") + "\n" + read("nodes.css") + "\n" + read("week.css") + "\n" + read("desk.css"))
         .replace("/*@SCROLL_CSS@*/", read("scroll.css"))
         .replace("/*@MOTION_CSS@*/", read("motion.css")))
 js = "\n".join(read(f) for f in ["data.js", "school.js", "routines.js", "journey.js", "scroll.js", "desk.js", "map-scenes.js", "map.js", "week.js"])
@@ -58,6 +58,11 @@ for m in re.finditer(r"cpp:\[", blocks_src):
 errs += [f"없는 앵커를 부름: '{n}'" for n in sorted(used - anchors.keys())]
 if errs:
     sys.exit("빌드 중단\n  " + "\n  ".join(errs))
+# 손글씨 글꼴(을지로체)은 쓰는 글자만 추려 넣었다. 글을 고쳐 새 글자가 생겼으면 알려 준다(그 글자만 다른 글꼴로 보인다)
+hand = re.search(r"/\*@chars (.*?) @\*/", read("font-hand.css"), re.S)
+hand_text = read("data.js") + read("school.js") + read("routines.js")
+missing = sorted({c for c in hand_text if "가" <= c <= "힣"} - set(hand.group(1) if hand else ""))
+if missing: print("참고: 손글씨 글꼴에 없는 글자", "".join(missing), "→ python3 tools/subset-hand-font.py")
 unused = sorted(anchors.keys() - used)
 if unused: print("참고: 아무 블록도 부르지 않는 앵커", unused)
 

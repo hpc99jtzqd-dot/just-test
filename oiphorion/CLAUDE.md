@@ -258,7 +258,10 @@ node tools/journey-e2e.cjs                       # 전체 e2e (약 10분). E2E_O
    - 둘 다 Google Fonts에 없어서 내려받게 할 수 없다. **민의 컴퓨터에 설치된 글꼴**을 이름으로 부른다. 없는 기기(폰)는 예전 글꼴(Gowun Dodum · Jua)로 보인다.
    - 서울알림체의 설치 이름을 확인하지 못해(seoul.go.kr이 이 세션에서 막힘) `@font-face "Oi Alrim"`에 `local()` 후보를 굵기별로 여럿 적었다. 민의 화면에서 제목이 안 바뀌면 설치된 이름을 받아 한 줄 더하면 된다.
    - 큰 제목 일곱 곳만 Bold(700)이고 `font-synthesis-weight:none`으로 Jua를 억지로 굵게 만들지 않는다. 나머지는 Medium.
-   - 두루마리의 손글씨(`--f-hand`)와 시각·코드(`--f-code`)는 그대로다.
+   - 두루마리의 손글씨(`--f-hand`: 이야기 한 줄 · 계획표)는 **배달의민족 을지로체**(민 지정). 이것은 npm `@kfonts/bm-euljiro`(OFL)에서 받아, 쓰는 글자만 추려 `src/font-hand.css`에 data: URI로 넣었다(약 100KB). 그래서 설치하지 않은 폰에서도 보인다.
+     - `python3 tools/subset-hand-font.py`가 만든다(fonttools · brotli 필요). data.js · school.js · routines.js의 글을 고쳐 새 글자가 생기면 `build.py`가 "손글씨 글꼴에 없는 글자"를 알려 준다. 그때 다시 돌린다.
+     - 아티팩트 CSP: Google Fonts 밖의 글꼴은 이렇게 페이지 안에 넣어야만 보인다. Pretendard · 서울알림체도 같은 방법으로 넣을 수 있다(서울알림체는 받을 곳이 이 세션에서 막혀 있다).
+   - 시각·코드(`--f-code`)는 그대로다.
 5. **아티팩트 CSP.** 외부 스크립트는 cdnjs / jsdelivr / unpkg만 허용된다. 폰트는 Google Fonts만 된다(Jua, Song Myung, Gowun Dodum, Nanum Gothic Coding, Nanum Pen Script). 지금은 외부 스크립트가 없다.
 6. **노드 버튼 크기.** 버튼에 실제 크기가 있어야 한다. 0×0 버튼은 클릭 테스트에 실패했다.
 9. **셰이더 안의 `조건 ? 함수A() : 함수B()`는 둘 다 계산될 수 있다 (2026-10-24 벤치).**
