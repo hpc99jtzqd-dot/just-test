@@ -4,6 +4,12 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=Song+Myung&family=Gowun+Dodum&family=Nanum+Gothic+Coding:wght@400;700&family=Nanum+Pen+Script&display=swap">
 <style>
+/* 글꼴(민 지정, 2026-11-11): 자주 읽는 글은 Pretendard, 제목·소제목·큰 글씨는 서울알림체.
+   둘 다 민의 컴퓨터에 설치된 것을 쓴다(아티팩트는 Google Fonts 말고는 글꼴을 내려받지 못한다).
+   설치되지 않은 기기(폰 등)에서는 예전 글꼴(Gowun Dodum · Jua)로 보인다.
+   서울알림체는 설치 이름이 판마다 달라 굵기별 이름을 여럿 적어 둔다. */
+@font-face{font-family:"Oi Alrim";font-weight:500;src:local("SeoulAlrimTTF-Medium"),local("SeoulAlrimOTF-Medium"),local("SeoulAlrim-Medium"),local("서울알림체 TTF Medium"),local("서울알림체 OTF Medium"),local("서울알림체 Medium"),local("서울알림체 M"),local("Seoul Alrim TTF Medium"),local("Seoul Alrim OTF Medium"),local("Seoul Alrim Medium"),local("SeoulAlrimTTF Medium"),local("SeoulAlrim TTF Medium"),local("SeoulAlrim Medium"),local("SeoulAlrim M")}
+@font-face{font-family:"Oi Alrim";font-weight:700;src:local("SeoulAlrimTTF-Bold"),local("SeoulAlrimOTF-Bold"),local("SeoulAlrim-Bold"),local("서울알림체 TTF Bold"),local("서울알림체 OTF Bold"),local("서울알림체 Bold"),local("서울알림체 B"),local("Seoul Alrim TTF Bold"),local("Seoul Alrim OTF Bold"),local("Seoul Alrim Bold"),local("SeoulAlrimTTF Bold"),local("SeoulAlrim TTF Bold"),local("SeoulAlrim Bold"),local("SeoulAlrim B")}
 /* 초원에서 석회암 능선과 설산까지 오르는 지도. 노드는 시간 블록, 다섯 풍경은 같은 지형과 길을 공유한다. */
 :root{
   color-scheme:light;
@@ -23,13 +29,14 @@
   --paper-ink:#24221f; --paper-ink-soft:#5a564e; --paper-red:#7b3322; --paper-blue:#2c4862;
   --paper-teal:#2d5a55; --paper-ochre:#7a5a1c; --paper-mark:rgba(58,55,49,.10); --paper-rule:rgba(58,55,49,.07);
   --paper-hl:rgba(196,110,60,.16); --rod:#7a736a; --rod-hi:#c9c2b6; --rod-lo:#4a453e;
-  --f-game:"Jua","Gowun Dodum","Apple SD Gothic Neo",sans-serif;
-  --f-display:"Song Myung","Nanum Myeongjo",serif;
-  --f-body:"Gowun Dodum","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --f-game:"Oi Alrim","서울알림체 TTF","서울알림체","서울알림체 OTF","Seoul Alrim TTF","Seoul Alrim","Seoul Alrim OTF","SeoulAlrimTTF","SeoulAlrim TTF","SeoulAlrim","SeoulAlrimOTF","Jua","Gowun Dodum","Apple SD Gothic Neo",sans-serif;
+  --f-display:"Oi Alrim","서울알림체 TTF","서울알림체","서울알림체 OTF","Seoul Alrim TTF","Seoul Alrim","Seoul Alrim OTF","SeoulAlrimTTF","SeoulAlrim TTF","SeoulAlrim","SeoulAlrimOTF","Song Myung","Nanum Myeongjo",serif;
+  --f-body:"Pretendard Variable","Pretendard","Gowun Dodum","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
   --f-code:"Nanum Gothic Coding","D2Coding",ui-monospace,monospace;
   --f-hand:"Nanum Pen Script","Gowun Dodum",cursive;
 }
 *{box-sizing:border-box}
+h1,.i-name,.p-title,.wk-title,.dk-head h2,.dk-cur,.dk-clock{font-weight:700!important;font-synthesis-weight:none}
 [hidden]{display:none!important}
 body{margin:0;background:linear-gradient(180deg,var(--sky-top) 0 45%,var(--grass-deep) 45% 100%);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.55}
 .bubbles{position:fixed;inset:0;z-index:6;pointer-events:none;overflow:hidden}
