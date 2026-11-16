@@ -169,13 +169,24 @@
       <div class="dk-bar" aria-hidden="true"><i id="dkBar"></i></div>
       <p class="dk-next" id="dkNext"></p>
       <p class="dk-warn" id="dkWarn" hidden></p>
+      <p class="dk-first" id="dkFirst" hidden></p>
       <p class="dk-toast" id="dkToast" role="status" hidden></p>
       <div class="dk-acts">
         <button type="button" class="dk-btn dk-go" id="dkDone">했음 ✓</button>
-        <button type="button" class="dk-btn" id="dkPlus5">+5분</button>
-        <button type="button" class="dk-btn" id="dkResync" title="아직 안 한 첫 조각이 지금 시작되게 시간표를 민다">지금부터 다시</button>
+        <button type="button" class="dk-btn" id="dkResync" title="밀린 조각이나 다음 조각이 지금 시작되게 시간표를 민다. 지금 하는 조각을 늘리지는 않는다">지금부터 다시</button>
       </div>
+      <form class="dk-fin" id="dkFin" hidden>
+        <p class="dk-fin-head" id="dkFinHead"></p>
+        <p class="dk-fin-sub">미완성이어도 지금 상태 그대로 저장하고 손을 뗀다. 그리고 두 줄만 적는다.</p>
+        <fieldset class="dk-burden"><legend>지금 느끼는 부담 <small>0 전혀 없음 · 10 다시 앉기 어려울 만큼 소진</small></legend>
+          <div class="dk-burden-row" id="dkBurden"></div></fieldset>
+        <label class="dk-fin-next">다음에 열 파일과 첫 행동 한 줄<input id="dkFinNext" type="text" maxlength="160" placeholder="예: 내일 같은 시각, 3번 단락 파일을 열어 첫 예시의 출처를 확인한다"></label>
+        <label class="dk-fin-chk"><input type="checkbox" id="dkFinSleep"> 수면이나 본업 시간을 침범했다</label>
+        <div class="dk-acts"><button type="submit" class="dk-btn dk-go">기록하고 손 떼기</button><button type="button" class="dk-btn" id="dkFinLater">나중에</button></div>
+      </form>
+      <p class="dk-back" id="dkBack" hidden>한 걸음 물러난다. 바로 다음 것을 얹지 말고, 방금 조각이 전체의 어디에 놓일지 한 번 본다. 쓸 만한지는 내일 아침 파일을 열기 전에 판정한다.</p>
     </section>
+    <section class="dk-judge" id="dkJudge" aria-label="어제 조각 판정" hidden></section>
     <section class="dk-plan" aria-label="조각 시간표">
       <div class="dk-plan-top">
         <h3>시간표</h3>
@@ -189,6 +200,7 @@
         <button type="button" class="dk-btn" data-q="add">+ 조각</button>
         <button type="button" class="dk-btn" data-q="rest">+ 쉼 10분</button>
         <button type="button" class="dk-btn" data-q="cut" id="dkAddCut" hidden>+ 덩이 조각</button>
+        <button type="button" class="dk-btn" data-q="copy" title="막히면 이미 쓴 대목을 깨끗이 옮겨 적는다(벤야민의 수칙)">+ 옮겨 적기 15분</button>
         <span class="dk-fill" id="dkFill">
           <span class="dk-sep" id="dkFillCap"></span>
           <button type="button" class="dk-btn" data-q="n2">2등분</button>
@@ -203,6 +215,13 @@
     <section class="dk-park" aria-label="주차장">
       <h3>주차장 <small>딴생각은 한 줄 세워 두고 조각으로 돌아간다</small></h3>
       <form id="dkParkForm"><input type="text" id="dkParkIn" maxlength="200" placeholder="예: 과제 공지 확인" aria-label="주차장에 세울 생각"><button type="submit" class="dk-btn">세우기</button></form>
+      <label class="dk-park-why"><input type="checkbox" id="dkParkReview"> 작업의 목적 자체가 의심된다 → 지금 풀지 않고 <input type="date" id="dkParkDate" aria-label="다시 볼 날"> 에 다시 본다</label>
+      <details class="dk-dike"><summary>생각이 끼어들 때 어떻게 하나</summary><ul>
+        <li><b>오늘 구간을 끝내는 데 꼭 필요하다</b> → 남은 시간 안에 지금 확인한다</li>
+        <li><b>다른 장면이나 새 도구가 떠올랐다</b> → 여기에 한 줄 세우고 돌아간다</li>
+        <li><b>작업 전체의 목적이 의심된다</b> → 위에 체크하고 다시 볼 날만 적어 둔다</li>
+        <li><b>지금 쓰는 내용에 명백한 오류가 보인다</b> → 지금 바로 고친다</li></ul>
+        <p>작업 시간에는 생각을 둑 안에 두고, 둑의 폭이 맞았는지는 다시 볼 날에 따진다.</p></details>
       <ul class="dk-park-list" id="dkParkList"></ul>
     </section>
     <footer class="dk-foot">
@@ -219,5 +238,15 @@
       <button type="button" class="dk-x" id="qrClose" data-qa="close" aria-label="채석장 닫기">✕</button>
     </header>
     <div class="qr-body" id="qrBody"></div>
+  </article>
+</div>
+
+<div class="overlay" id="expOv" hidden>
+  <article class="desk qr ex" role="dialog" aria-modal="true" aria-labelledby="exTitle">
+    <header class="dk-head">
+      <div><h2 id="exTitle">2주 실험</h2><p class="dk-meta">구간과 완료 조건을 먼저 정하는 방식이 나에게 맞는지, 여덟 번 앉아서 확인한다</p></div>
+      <button type="button" class="dk-x" id="exClose" data-xa="close" aria-label="실험 닫기">✕</button>
+    </header>
+    <div class="qr-body" id="exBody"></div>
   </article>
 </div>

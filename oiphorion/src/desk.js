@@ -7,7 +7,14 @@
      판정(1·2·3선, 모자·트램펄린)과는 무관하다. 같은 날을 두 기기에서 고치면 나중에 저장한 쪽이 남는다.
    - 이 파일은 map.js보다 먼저 온다(showInfo가 DESK.sync를 부른다). map.js의 것(state, sel, byId, selectedDate …)은
      부를 때만 쓰므로 순서가 맞다.
-   - 초 단위로 바뀌는 것은 책상 안의 시계 글자뿐이다. 안내판은 분이 바뀔 때만 다시 쓴다(함정 8: 계속 도는 것 금지). */
+   - 초 단위로 바뀌는 것은 책상 안의 시계 글자뿐이다. 안내판은 분이 바뀔 때만 다시 쓴다(함정 8: 계속 도는 것 금지).
+   - 멈춤과 판정(민이 준 「Nov 16th」 정제본, 2026-11-16): '끝'을 셋으로 나눈다.
+     ① 오늘 앉을 시각이 끝나는 것은 시각으로: 조각 시간이 다 되면 "정해 둔 시각이다. 여기서 멈춘다." 늘리는 단추(+5분)는 없다.
+     ② 조각이 쓸 만한지는 기능으로: 다음 날 아침 파일을 열기 전에 세 가지(제 기능 · 독립 · 들어갈 자리)를 판정. 셋 다 예여야 '쓸 수 있는 조각'.
+     ③ 전체의 방향은 따로: 채석장의 '다시 볼 날'(quarry.js).
+     조각이 끝나면 마침 기록: 부담 0~10, 다음에 열 파일과 첫 행동 한 줄, 수면·본업 침범. 부담이 두 번 연속 8 이상이거나
+     침범이 일주일에 두 번이면 쉬어 가라고 알린다(꾸짖지 않는다). 조각 필드: f 기록함 · b 부담(-1 없음) · nx 첫 행동 · sl 침범 ·
+     j 판정("110" 꼴, 빈 문자열이면 아직) · pl 들어간 자리 · x 실험 회차(-1 아님) · ph 실험 단계 */
 const DESK=(()=>{
   const $=id=>document.getElementById(id);
   const ov=$("deskOv"), list=$("dkList"), parkList=$("dkParkList");
@@ -30,7 +37,9 @@ const DESK=(()=>{
     if(p&&p.b&&typeof p.b==="object") for(const [id,v] of Object.entries(p.b)){
       if(!v||!Array.isArray(v.p)||!v.p.length) continue;
       out.b[id]={s:Number.isFinite(v.s)?v.s:null,p:v.p.filter(x=>x&&typeof x==="object").map(x=>(
-        {m:Math.max(1,Math.min(600,Math.round(num(x.m,25)))),t:String(x.t||"").slice(0,120),n:String(x.n||"").slice(0,2000),d:x.d?1:0,r:x.r?1:0,c:x.c?1:0}))};   // c: 이번 주 덩이 조각(quarry.js)
+        {m:Math.max(1,Math.min(600,Math.round(num(x.m,25)))),t:String(x.t||"").slice(0,120),n:String(x.n||"").slice(0,2000),d:x.d?1:0,r:x.r?1:0,c:x.c?1:0,   // c: 이번 주 덩이 조각(quarry.js)
+         f:x.f?1:0,b:Number.isInteger(x.b)&&x.b>=0&&x.b<=10?x.b:-1,nx:String(x.nx||"").slice(0,160),sl:x.sl?1:0,j:/^[01]{3}$/.test(x.j||"")?x.j:"",pl:String(x.pl||"").slice(0,80),
+         x:Number.isInteger(x.x)&&x.x>=0?x.x:-1,ph:String(x.ph||"").slice(0,8)}))};
     }
     if(p&&Array.isArray(p.park)) out.park=p.park.filter(x=>x&&typeof x==="object"&&x.t).map(x=>({t:String(x.t).slice(0,200),d:x.d?1:0}));
     return out;
@@ -55,6 +64,29 @@ const DESK=(()=>{
     let bp=cur.plan.b[b.id];
     if(!bp){ const w=win(b); let s=w[0]; if(today()){ const n=round5(nowFor(w)/60); if(n>w[0]&&n<w[1]) s=n; } bp=cur.plan.b[b.id]={s,p:[]}; }
     return bp;
+  }
+  /* 다른 날의 계획 고치기(어제 조각 판정). 보고 있는 날이면 작업본을 고친다 */
+  function editPlan(date,fn){
+    if(date===cur.date){ fn(cur.plan); dirty(); flush(); return; }
+    const p=clean(JOURNEY.plan(date)); fn(p); Promise.resolve(JOURNEY.savePlan(date,{b:p.b,park:p.park})).catch(e=>console.error(e));
+  }
+  /* 읽어 둔 날들(지난 7일~이번 주)의 공부 조각을 시간 순서로: 부담 흐름 · 지난번 첫 행동 · 판정할 조각 */
+  function history(){
+    const out=[], t=JOURNEY.todayKey();
+    for(let i=-8;i<=0;i++){ const date=new Date(Date.parse(t+"T00:00:00Z")+i*864e5).toISOString().slice(0,10);
+      const plan=date===cur.date?cur.plan:clean(JOURNEY.plan(date));
+      for(const [id,bp] of Object.entries(plan.b)){ let t0=bp.s??0; bp.p.forEach((x,k)=>{ if(!x.r) out.push({date,id,i:k,x,t0,t1:t0+x.m}); t0+=x.m; }); } }
+    return out.sort((a,b)=>a.date.localeCompare(b.date)||a.t0-b.t0);
+  }
+  /* 쉬어 가라는 알림(실험 기록도 함께 센다) */
+  function restWarn(){
+    const h=history().filter(e=>e.x.f), ex=(typeof EXPER!=="undefined"?EXPER.records():[]);
+    const seq=[...h.filter(e=>e.x.b>=0).map(e=>({k:e.date+String(e.t1).padStart(5,"0"),b:e.x.b})),...ex.filter(r=>r.burden>=0).map(r=>({k:r.date+"99999",b:r.burden}))].sort((a,b)=>a.k.localeCompare(b.k));
+    const week=new Date(Date.parse(JOURNEY.todayKey()+"T00:00:00Z")-6*864e5).toISOString().slice(0,10);
+    const intr=h.filter(e=>e.x.sl&&e.date>=week).length+ex.filter(r=>r.sleep&&r.date>=week).length;
+    const msg=[]; if(seq.length>=2&&seq[seq.length-1].b>=8&&seq[seq.length-2].b>=8) msg.push("부담이 두 번 연속 8 이상이다. 다음 회차를 줄이거나 하루 쉬어 간다.");
+    if(intr>=2) msg.push("이번 주에 수면이나 본업을 "+intr+"번 침범했다. 앉는 횟수를 줄인다.");
+    return msg.join(" ");
   }
   function stat(){ let n=0,k=0,m=0; for(const bp of Object.values(cur.plan.b)) for(const x of bp.p){ if(x.r) continue; n++; if(x.d){ k++; m+=x.m; } } return {n,k,m}; }
 
@@ -89,6 +121,7 @@ const DESK=(()=>{
           '<span class="tm">'+hhmm(r.t0)+'</span><span class="tt">'+esc(nameOf(x))+'</span><span class="mm">'+(i===a?Math.ceil((r.t1*60-nowFor(w))/60)+"분 남음":x.m+"분")+'</span></label></li>'; }).join("")+'</ol>';
     }
     const bits=[]; if(n) bits.push("조각 "+work.filter(x=>x.d).length+"/"+work.length+(n>3?" · 전체 "+n+"개":"")); if(park) bits.push("주차장 "+park);
+    const jn=toJudge().length; if(jn&&isToday()) bits.unshift("어제 조각 판정 "+jn+"개");
     h+='<div class="dk-mini-foot"><button type="button" class="dk-open">'+(n?"책상 펴기 · 집중":"✂ 블록 쪼개기")+'</button><span>'+(bits.join(" · ")||"이 칸을 내 단위로 나눠 적는다")+'</span></div>';
     sec.innerHTML=h;
   }
@@ -126,7 +159,7 @@ const DESK=(()=>{
     put(el,"◆ 이번 주 덩이 · "+dkCut.t+" · 조각 "+dkCut.k+"/"+dkCut.est+(over?" · 세 번 앉을 크기를 넘는다. 늘리지 말고 더 자른다.":""));
   }
   function renderList(open){
-    const bp=cur.plan.b[dk.id], p=bp?bp.p:[]; cutLine();
+    const bp=cur.plan.b[dk.id], p=bp?bp.p:[]; cutLine(); renderJudge();
     openRow=open!=null&&open>=0&&open<p.length?open:-1;
     list.innerHTML=p.map(rowHTML).join(""); list.hidden=!p.length;
     list.querySelectorAll(".dk-note").forEach(grow);
@@ -158,7 +191,7 @@ const DESK=(()=>{
     put($("dkMeta"),DAY_NAMES[dayIdx]+"요일 "+hhmm(L.w[0])+" – "+hhmm(L.w[1])+(st.n?" · 오늘 한 조각 "+st.k+"/"+st.n+(st.m?" ("+dur(st.m)+")":""):""));
     // 지금 조각
     const cap=$("dkCap"), curEl=$("dkCur"), clk=$("dkClock"), bar=$("dkBar"), nx=$("dkNext"), warn=$("dkWarn");
-    let frac=0, canDone=false; warn.hidden=true;
+    let frac=0, canDone=false; warn.hidden=true; warn.textContent="";
     if(!L.p.length){ cap.textContent=isT?"이 칸":"계획"; curEl.textContent="이 칸을 내 단위로 나눠 보자"; clk.textContent=dur(Math.max(0,free)); nx.textContent="조각마다 할 일을 한 줄씩 적으면, 그 조각 동안은 그것만 한다."; }
     else if(!isT){ cap.textContent="계획"; curEl.textContent=DAY_NAMES[dayIdx]+"요일 계획을 세우는 중"; clk.textContent=dur(L.end-L.s); nx.textContent="그날이 되면 여기에 지금 조각과 남은 시간이 나온다."; }
     else if(a>=0){ const r=L.rows[a], x=L.p[a]; cap.textContent=x.r?"지금 · 쉼":"지금"; curEl.textContent=nameOf(x);
@@ -169,9 +202,25 @@ const DESK=(()=>{
     else { const undone=L.p.filter(q=>!q.d&&!q.r).length; cap.textContent="조각 끝"; curEl.textContent=undone?"못 끝낸 조각 "+undone+"개":"이 칸의 조각을 다 했다";
       clk.textContent=n<L.w[1]*60?clock(L.w[1]*60-n):"0:00"; nx.textContent=n<L.w[1]*60?"칸 끝까지 남은 시간이다. 조각을 더하거나 '지금부터 다시'.":"칸이 끝났다. 다음 칸으로."; canDone=undone>0; }
     clk.classList.toggle("words",!/^[\d:]+$/.test(clk.textContent));   // 숫자 시계가 아닌 글(3시간 10분)은 작게
-    document.querySelector(".dk-acts").hidden=!L.p.length;
+    // 마침 기록: 시간이 다 됐거나 '했음'을 누른 공부 조각 가운데 아직 적지 않은 것
+    const fi=isT?L.p.findIndex((q,i)=>!q.r&&!q.f&&q.x<0&&!later.has(dk.id+"|"+i)&&(q.d||L.rows[i].t1*60<=n)):-1;
+    const xs=isT?L.p.findIndex((q,i)=>q.x>=0&&q.ph==="log"&&(q.d||L.rows[i].t1*60<=n)&&typeof EXPER!=="undefined"&&EXPER.needsRecord(q.x)):-1;
+    finIdx=fi; const fin=$("dkFin");
+    if(fi>=0){ if(fin.hidden||fin.dataset.i!==String(fi)){ fin.dataset.i=fi; fin.hidden=false; fin.reset(); burdenPick=-1; paintBurden();
+        put($("dkFinHead"),(L.p[fi].d&&L.rows[fi].t1*60>n?"끝냈다 · ":"정해 둔 시각이다. 여기서 멈춘다 · ")+nameOf(L.p[fi])); } }
+    else fin.hidden=true;
+    document.querySelector(".dk-focus").classList.toggle("finning",fi>=0);   // 기록하는 동안에는 시계·안내를 접는다
+    const back=$("dkBack"); back.hidden=fi>=0||Date.now()>backUntil;
+    if(xs>=0&&fi<0){ back.hidden=false; back.innerHTML='실험 '+(L.p[xs].x+1)+'회차의 시간이 끝났다. <button type="button" class="dk-btn" data-xa="open">실험 기록하기</button>'; }
+    else if(!back.hidden) back.textContent="한 걸음 물러난다. 바로 다음 것을 얹지 말고, 방금 조각이 전체의 어디에 놓일지 한 번 본다. 쓸 만한지는 내일 아침 파일을 열기 전에 판정한다.";
+    const firstEl=$("dkFirst"), last=isT?history().filter(e=>e.x.f&&e.x.nx&&!(e.date===cur.date&&e.id===dk.id&&e.i===a)).pop():null;
+    firstEl.hidden=!last||fi>=0; if(last) put(firstEl,"지난번 적어 둔 첫 행동 · "+last.x.nx);
+    const rw=isT?restWarn():""; if(rw){ warn.hidden=false; warn.textContent=(warn.textContent&&!warn.hidden?warn.textContent+" ":"")+rw; }
+    document.querySelector(".dk-acts").hidden=!L.p.length||fi>=0;
     bar.style.transform="scaleX("+Math.max(0,Math.min(1,frac)).toFixed(4)+")";
-    $("dkDone").disabled=!canDone; $("dkPlus5").disabled=a<0; $("dkResync").disabled=!isT||!L.p.some(q=>!q.d);
+    // 지금부터 다시: 밀린 조각이나 다음 조각을 지금 시작하게 민다. 지금 하고 있는(안 끝낸) 조각을 늘리는 데는 쓰지 않는다
+    const k0=L.p.findIndex(q=>!q.d);
+    $("dkDone").disabled=!canDone; $("dkResync").disabled=!isT||k0<0||k0===a;
     const title=isT&&a>=0?clock(L.rows[a].t1*60-n)+" · "+nameOf(L.p[a])+" · 오이포리온":"오이포리온"; if(document.title!==title) document.title=title;
   }
   const freshStart=b=>{ const w=win(b); if(today()){ const n=round5(nowFor(w)/60); if(n>w[0]&&n<w[1]) return n; } return w[0]; };
@@ -179,7 +228,7 @@ const DESK=(()=>{
   function openDesk(id,quiet){
     const b=byId(id); if(!win(b)) return;
     load(selectedDate()); dk={date:cur.date,id}; clearArm=0; store.set("oi.desk","1");
-    $("dkTitle").textContent=b.name; $("dkChime").checked=store.get("oi.chime")!=="0";
+    $("dkTitle").textContent=b.name; $("dkChime").checked=store.get("oi.chime")!=="0"; $("dkParkDate").value=plusDays(7); $("dkParkDate").min=plusDays(1);
     ov.hidden=false; ov.scrollTop=0; renderList(); renderPark(); if(!quiet) prime(); lockScreen();
     $("dkClose").focus({preventScroll:true});
   }
@@ -226,9 +275,10 @@ const DESK=(()=>{
   $("dkQuick").addEventListener("click",e=>{
     const q=e.target.closest("[data-q]"); if(!q) return; const b=block(), kind=q.dataset.q;
     const bp=ensure(b), L=layout(b), at0=bp.p.length; let left=L.left;
-    const push=(m,r)=>bp.p.push({m,t:r?"쉼":"",n:"",d:0,r:r?1:0,c:0});
+    const push=(m,r)=>bp.p.push({m,t:r?"쉼":"",n:"",d:0,r:r?1:0,c:0,x:-1});
     if(kind==="add") push(left>=5&&left<25?left:25);
-    else if(kind==="cut"){ if(!dkCut) return; bp.p.push({m:25,t:dkCut.t,n:"",d:0,r:0,c:1}); }   // 덩이 제목이 채워진 25분 조각
+    else if(kind==="cut"){ if(!dkCut) return; bp.p.push({m:25,t:dkCut.t,n:"",d:0,r:0,c:1,x:-1}); }   // 덩이 제목이 채워진 25분 조각
+    else if(kind==="copy") bp.p.push({m:15,t:"옮겨 적기: 이미 쓴 대목을 깨끗이 옮겨 적는다",n:"",d:0,r:0,c:0,x:-1});   // 막혔을 때의 기본 행동
     else if(kind==="rest") push(10,1);
     else if(/^n\d$/.test(kind)){ const k=+kind[1]; if(left<10) return; const base=Math.max(5,Math.floor(left/k/5)*5); for(let i=0;i<k-1;i++) push(base); push(Math.max(1,left-base*(k-1))); }
     else { const work=+kind, rest=work>=50?10:5, tail=work>=50?15:10; if(left<10) return;   // 공부 work분 + 쉼 rest분을 되풀이
@@ -241,12 +291,44 @@ const DESK=(()=>{
   /* 지금 조각 단추 */
   $("dkDone").addEventListener("click",()=>{
     const b=block(), L=layout(b), a=active(L), p=L.p;
-    if(a>=0){ const x=p[a]; x.d=1;   // 일찍 끝냈으면 걸린 시간(5분 단위로 올림)으로 줄여, 다음 조각이 곧 시작되게 한다
-      const el=Math.max(5,Math.ceil((nowFor(L.w)-L.rows[a].t0*60)/300)*5); if(el<x.m) x.m=el; }
+    if(a>=0) p[a].d=1;   // 일찍 끝내도 시간표는 그대로 둔다: 남은 시간은 물러나 보는 시간이다. 다음으로 바로 가려면 '지금부터 다시'
     else { const x=p.find(q=>!q.d&&!q.r); if(x) x.d=1; }
     dirty(); renderList();
   });
-  $("dkPlus5").addEventListener("click",()=>{ const b=block(), L=layout(b), a=active(L); if(a<0) return; L.p[a].m+=5; dirty(); renderList(); });
+  /* 마침 기록 */
+  let finIdx=-1, burdenPick=-1, backUntil=0; const later=new Set();
+  const burdenEl=$("dkBurden");
+  burdenEl.innerHTML=Array.from({length:11},(_,k)=>'<button type="button" data-b="'+k+'" aria-pressed="false">'+k+'</button>').join("");
+  function paintBurden(){ burdenEl.querySelectorAll("[data-b]").forEach(b=>{ const on=+b.dataset.b===burdenPick; b.setAttribute("aria-pressed",String(on)); b.classList.toggle("hi",+b.dataset.b>=8); }); }
+  burdenEl.addEventListener("click",e=>{ const b=e.target.closest("[data-b]"); if(!b) return; burdenPick=+b.dataset.b; paintBurden(); });
+  $("dkFin").addEventListener("submit",e=>{ e.preventDefault(); const x=cur.plan.b[dk.id]&&cur.plan.b[dk.id].p[finIdx]; if(!x) return;
+    Object.assign(x,{f:1,b:burdenPick,nx:$("dkFinNext").value.trim().slice(0,160),sl:$("dkFinSleep").checked?1:0});
+    backUntil=Date.now()+5*60e3; $("dkFin").hidden=true; dirty(); flush(); renderList(); });
+  $("dkFinLater").addEventListener("click",()=>{ later.add(dk.id+"|"+finIdx); $("dkFin").hidden=true; paint(); });
+
+  /* 어제 조각 판정: 다음 날 아침, 파일을 열기 전에. 셋 다 예여야 쓸 수 있는 조각이다 */
+  function toJudge(){ const t=JOURNEY.todayKey(); return history().filter(e=>e.date<t&&e.x.f&&!e.x.j&&e.x.x<0); }
+  const Q3=[["제 기능을 하는가","미리 정한 완료 조건을 채웠다"],["혼자 성립하는가","덧붙이는 설명 없이도 읽히거나 들린다"],["들어갈 자리가 있는가","전체 목차나 곡 구성에서 놓일 곳을 짚을 수 있다"]];
+  function renderJudge(){
+    const el=$("dkJudge"), items=today()?toJudge():[];
+    el.hidden=!items.length; if(!items.length){ el.innerHTML=""; return; }
+    const usable=history().filter(e=>e.x.j==="111").length;
+    el.innerHTML='<h3>어제 조각 판정 <small>파일을 열기 전에 · 세 가지가 모두 예여야 쓸 수 있는 조각이다'+(usable?' · 이번 주 쓸 수 있는 조각 '+usable+'개':'')+'</small></h3>'+
+      items.map((e,n)=>{ const q=e.x.c&&typeof QUARRY!=="undefined"?QUARRY.quarryOfDate(e.date):null, slots=q&&q.outline?q.outline.split("\n").map(v=>v.trim()).filter(Boolean):[];
+        return '<form class="dk-jrow" data-date="'+e.date+'" data-id="'+e.id+'" data-i="'+e.i+'"><p class="dk-jname"><b>'+esc(nameOf(e.x))+'</b> <small>'+(+e.date.slice(5,7))+'/'+(+e.date.slice(8))+' '+hhmm(e.t0)+'</small></p>'+
+          Q3.map(([qq,hint],k)=>'<fieldset class="dk-q"><legend>'+(k+1)+'. '+qq+' <small>'+hint+'</small></legend>'+
+            (k===2&&slots.length?'<select name="q2" aria-label="들어갈 자리"><option value="">고른다</option>'+slots.map(v=>'<option value="'+esc(v)+'">'+esc(v)+'</option>').join("")+'<option value="-">자리가 없다</option></select>'
+              :'<label><input type="radio" name="q'+k+'" value="1" required><span>예</span></label><label><input type="radio" name="q'+k+'" value="0"><span>아니오</span></label>')+'</fieldset>').join("")+
+          '<div class="dk-acts"><button type="submit" class="dk-btn dk-go">판정 저장</button></div></form>'; }).join("");
+  }
+  $("dkJudge").addEventListener("submit",e=>{ e.preventDefault(); const f=e.target, d=new FormData(f), date=f.dataset.date, id=f.dataset.id, i=+f.dataset.i;
+    const sel3=f.querySelector('select[name="q2"]'), v2=d.get("q2"), slot=sel3&&v2&&v2!=="-"?String(v2):"";
+    const ans=[d.get("q0"),d.get("q1"),sel3?(v2?(v2==="-"?"0":"1"):null):v2];
+    if(ans.some(v=>v==null||v==="")){ (sel3&&!v2?sel3:f.querySelector("input:invalid"))?.focus(); return; }   // 셋 다 골라야 저장된다
+    let title="";
+    editPlan(date,plan=>{ const x=plan.b[id]&&plan.b[id].p[i]; if(!x) return; x.j=ans.join(""); x.pl=slot; title=nameOf(x); });
+    if(slot&&typeof QUARRY!=="undefined") QUARRY.place(date,slot,title,ans.join("")==="111");
+    renderJudge(); paint(); });
   $("dkResync").addEventListener("click",()=>{   // 아직 안 한 첫 조각이 지금 시작되게 시작 시각을 민다
     const b=block(), L=layout(b), k=L.p.findIndex(q=>!q.d); if(k<0||!today()) return;
     cur.plan.b[dk.id].s=round5(nowFor(L.w)/60)-L.p.slice(0,k).reduce((s,q)=>s+q.m,0); dirty(); paint();
@@ -254,7 +336,12 @@ const DESK=(()=>{
   $("dkChime").addEventListener("change",e=>{ store.set("oi.chime",e.target.checked?"1":"0"); if(e.target.checked){ prime(); beep(); } });
   /* 주차장 */
   $("dkParkForm").addEventListener("submit",e=>{ e.preventDefault(); const inp=$("dkParkIn"), t=inp.value.trim(); if(!t) return;
+    if($("dkParkReview").checked){   // 목적 자체가 의심되면 여기서 풀지 않고 다시 볼 날로 미룬다(채석장 화면에 그날 뜬다)
+      const day=$("dkParkDate").value||plusDays(7);
+      Promise.resolve(JOURNEY.saveReviews([...JOURNEY.reviews(),{t:t.slice(0,200),date:day,from:JOURNEY.todayKey()}])).catch(err=>console.error(err));
+      $("dkParkReview").checked=false; inp.value=""; renderPark(); const toast=$("dkToast"); toast.textContent=(+day.slice(5,7))+"/"+(+day.slice(8))+"에 다시 본다. 지금은 조각으로 돌아간다."; toast.hidden=false; clearTimeout(toastT); toastT=setTimeout(()=>{ toast.hidden=true; },8000); return; }
     cur.plan.park.push({t:t.slice(0,200),d:0}); inp.value=""; dirty(); renderPark(); inp.focus(); });
+  const plusDays=n=>new Date(Date.parse(JOURNEY.todayKey()+"T00:00:00Z")+n*864e5).toISOString().slice(0,10);
   parkList.addEventListener("change",e=>{ const box=e.target.closest("input[data-i]"); if(!box) return; cur.plan.park[+box.dataset.i].d=box.checked?1:0; dirty(); renderPark(); });
   parkList.addEventListener("click",e=>{ const del=e.target.closest("[data-del]"); if(!del) return; cur.plan.park.splice(+del.dataset.del,1); dirty(); renderPark(); });
 
@@ -275,7 +362,7 @@ const DESK=(()=>{
     const np=nowPiece();
     if(prevPiece&&(!np||np.key!==prevPiece.key)){ const n=nowFor(prevPiece.w);   // 시간이 흘러 끝난 것만(고쳐서 바뀐 것은 아님)
       if(n>=prevPiece.t1*60&&n<prevPiece.t1*60+90){ if(store.get("oi.chime")!=="0") beep();
-        const t=$("dkToast"); t.textContent="조각 끝: "+prevPiece.name+(np?" → 다음: "+np.name:""); t.hidden=false; clearTimeout(toastT); toastT=setTimeout(()=>{ t.hidden=true; },20000); } }
+        const t=$("dkToast"); t.textContent="정해 둔 시각이다. 여기서 멈춘다. ("+prevPiece.name+")"+(np?" 다음은 "+np.name:""); t.hidden=false; clearTimeout(toastT); toastT=setTimeout(()=>{ t.hidden=true; },20000); } }
     prevPiece=np;
     if(dk) paint();
     else { const m=Math.floor(nowSec()/60); if(m!==lastMin){ lastMin=m; if(!walking) sync(); } }
@@ -297,6 +384,13 @@ const DESK=(()=>{
   return {
     sync,
     open:openDesk,
+    /* 실험 회차를 오늘 지금 칸(없으면 고른 칸)에 올리고 책상을 편다. 못 올리면 이유를 돌려준다 */
+    addPieces(pieces){
+      if(!isToday()) return "요일 단추에서 오늘을 먼저 고른다.";
+      const id=nowId()||sel, b=byId(id); if(!win(b)) return "지금 칸에 시간이 없다. 공부 칸을 골라 다시 올린다.";
+      load(JOURNEY.todayKey()); const bp=ensure(b); bp.p.push(...pieces.map(x=>Object.assign({n:"",d:0,r:0,c:0,f:0,b:-1,nx:"",sl:0,j:"",pl:""},x)));
+      dirty(); flush(); openDesk(id); return ""; },
+    history:()=>history(),
     /* 책상을 편 채 페이지를 떠났고 지금 조각이 진행 중이면, 다시 열었을 때 책상부터 보인다 */
     restore(){ if(store.get("oi.desk")!=="1"||dk) return; load(selectedDate()); const np=sceneMode==="day"&&nowPiece();
       if(np) openDesk(np.key.split("|")[0],true); else store.set("oi.desk","0"); },

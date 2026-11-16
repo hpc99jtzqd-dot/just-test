@@ -12,6 +12,12 @@
    지킬 것: 1·2·3선, 모자, 트램펄린, 일요일 점프와 섞지 않는다(덩이를 못 넘겨도 아무것도 잃지 않는다).
             연속 기록(며칠째)을 세지 않는다. 채석장에 진행률을 두지 않는다.
    저장: JOURNEY.saveQuarries / saveCut → 이 기기 + db(meta/quarries, cuts/<월요일>). 나중에 저장한 쪽이 이긴다.
+   정제본(「Nov 16th」 refined)에서 더한 것:
+   - 유지와 검토를 나눈다(죽은 황제): 채석장마다 '당분간 유지할 가정' · '다시 볼 날' · '바꿀 기준'. 그날이 오면 이 화면 맨 위에 뜬다.
+     주차장에서 '목적 자체가 의심됨'으로 미룬 질문(JOURNEY.reviews)도 같은 자리에 뜬다.
+   - 모자이크: 채석장마다 '목차'(한 줄에 한 자리). 조각 판정 ③에서 자리를 고르면 그 자리에 조각이 놓인다(q.placed).
+     빈 자리는 빈틈으로 보인다. 조각을 늘리기 전에 잇는 일이 급한지 여기서 본다.
+   - 받을 사람·넘길 날은 효과가 보장된 장치가 아니라 나에게 맞는지 시험해 볼 장치다(외부 마감이 낫다는 2002년 연구는 2026년에 철회됐다).
    이 파일은 desk.js 뒤, map.js 앞에 온다. 서로는 부를 때만 쓴다. 클래스 이름은 qr-·cs-로 시작한다. */
 const QUARRY=(()=>{
   const $=id=>document.getElementById(id);
@@ -27,7 +33,7 @@ const QUARRY=(()=>{
   const late=(week,c)=>c.state==="open"&&today()>shift(week,5);          // 토요일이 지나도록 열려 있다
   const STATE={open:"열림",handed:"넘김",dropped:"버림",smaller:"더 작게 잘라 다음 주로"};
   const quarryName=id=>(JOURNEY.quarries().find(q=>q.id===id)||{}).name||"지운 채석장";
-  let selected=null, mode=null, msg="", armed="", lastStripH=-1, origin=null;
+  let selected=null, mode=null, msg="", armed="", lastStripH=-1, origin=null, editQ="";
 
   /* 덩이의 진행: 그 주 책상 계획에서 '덩이 조각'으로 표시한 것(n)과 그 가운데 했음(k) */
   function pieces(week){
@@ -54,9 +60,16 @@ const QUARRY=(()=>{
     if(c) return {text:"이번 주 덩이 · "+c.t+" · "+STATE[c.state],act:"open",btn:"돌담 보기",c};
     return {text:"이번 주 덩이가 아직 없다",act:"open",btn:qs.length?"떼어 내기":"채석장 열기"};
   }
+  /* 다시 볼 날이 된 것: 채석장의 가정 · 주차장에서 미룬 질문 */
+  function dueReviews(){
+    const t=today();
+    return [...JOURNEY.quarries().filter(q=>q.review&&q.review<=t&&!q.rest).map(q=>({kind:"q",id:q.id,t:q.keep||"처음 세운 구상",q})),
+            ...JOURNEY.reviews().map((v,i)=>({kind:"r",i,...v})).filter(v=>v.date<=t)];
+  }
   function sync(){
-    const s=summary(), strip=$("cutStrip"), cw=JOURNEY.cut(monday());
-    strip.innerHTML='<span class="cs-mark" aria-hidden="true">◆</span><span class="cs-text">'+h(s.text)+'</span><button type="button" data-qa="'+s.act+'" data-value="'+h(s.week||"")+'">'+s.btn+'</button>';
+    const s=summary(), strip=$("cutStrip"), cw=JOURNEY.cut(monday()), due=dueReviews().length, ex=typeof EXPER!=="undefined"?EXPER.stripText():"";
+    strip.innerHTML='<span class="cs-mark" aria-hidden="true">◆</span><span class="cs-text">'+h(s.text)+(due?' · 다시 볼 날 '+due+'개':"")+'</span><button type="button" data-qa="'+s.act+'" data-value="'+h(s.week||"")+'">'+s.btn+'</button>'+
+      (ex?'<span class="cs-exp"><span>'+h(ex)+'</span><button type="button" data-xa="open">실험</button></span>':"");
     const card=$("wkCut");
     card.innerHTML='<p><span class="cs-mark" aria-hidden="true">◆</span> '+h(s.text)+(s.c&&s.c.state==="open"?'<br><small>끝의 모양 · '+h(s.c.end)+'</small>':"")+'</p>'+
       '<div class="qr-actions">'+(cw&&cw.state==="open"&&!late(monday(),cw)?'<button type="button" class="dk-btn" data-qa="hand" data-value="'+monday()+'">넘겼음</button>':"")+
@@ -125,9 +138,16 @@ const QUARRY=(()=>{
     const list=qs.map(q=>{ const handed=Object.values(all).filter(c=>c.q===q.id&&c.state==="handed");
       return '<li><div class="qr-qhead"><b>'+h(q.name)+'</b><span>넘긴 덩이 '+handed.length+'개'+(q.rest?" · 쉬는 중":"")+'</span></div>'+
         (q.note?'<p class="qr-soft">'+h(q.note)+'</p>':"")+(handed.length?'<ul class="qr-handed">'+handed.map(c=>'<li>'+h(c.t)+'</li>').join("")+'</ul>':"")+
-        '<div class="qr-actions">'+btn(q.rest?"다시 열기":"쉬게 두기","rest",q.id,"qr-small")+btn(armed==="del"+q.id?"정말 지울까? 한 번 더":"지우기","delq",q.id,"qr-small")+'</div></li>'; }).join("");
+        (q.keep?'<p class="qr-keep">유지할 가정 · '+h(q.keep)+(q.review?' <small>'+md(q.review)+'에 다시 본다'+(q.crit?' · 바꿀 기준: '+h(q.crit):"")+'</small>':"")+'</p>':"")+mosaic(q)+
+        (editQ===q.id?quarryForm(q):"")+
+        '<div class="qr-actions">'+(editQ===q.id?"":btn("가정·목차 적기","editq",q.id,"qr-small"))+btn(q.rest?"다시 열기":"쉬게 두기","rest",q.id,"qr-small")+btn(armed==="del"+q.id?"정말 지울까? 한 번 더":"지우기","delq",q.id,"qr-small")+'</div></li>'; }).join("");
+    const due=dueReviews();
     box.innerHTML='<p class="qr-lead">여기는 끝내지 않아도 되는 곳이다. 캐낸 것만 센다.</p>'+
       '<p class="qr-msg" id="qrMsg" role="status" tabindex="-1">'+h(msg)+'</p>'+
+      (due.length&&!mode?'<section class="qr-due"><h3>다시 볼 날이 됐다 <small>오늘은 이 질문을 따지는 시간이다. 작업 시간에는 둑 안에 둔다</small></h3><ul>'+due.map(v=>
+        '<li><b>'+h(v.t)+'</b>'+(v.kind==="q"?'<small>'+h(v.q.name)+'의 유지할 가정'+(v.q.crit?' · 바꿀 기준: '+h(v.q.crit):"")+'</small>':'<small>'+md(v.from||v.date)+'에 주차장에서 미룬 질문</small>')+
+        '<div class="qr-actions">'+(v.kind==="q"?btn("그대로 유지 · 4주 뒤 다시","keepq",v.id,"qr-small")+btn("가정을 고친다","editq",v.id,"qr-small")
+          :btn("따져 봤다 · 지우기","donerv",v.i,"qr-small")+btn("1주 뒤 다시","laterrv",v.i,"qr-small"))+'</div></li>').join("")+'</ul></section>':"")+
       '<section>'+(mode?form():'<h3>'+(selected===cur?"이번 주 덩이":"다음 주 덩이")+' <small>'+md(selected)+' 주</small></h3>'+cutCard(selected)+
         '<div class="qr-actions">'+(selected!==cur?btn("이번 주 보기","week",cur):"")+(target!==cur&&selected!==target&&all[target]?btn("다음 주 보기","week",target):"")+
         (!all[target]&&active.length?btn(target===cur?"이번 주 덩이 떼기":"다음 주 덩이 떼기","new",target,"dk-go"):"")+
@@ -137,8 +157,30 @@ const QUARRY=(()=>{
         (qs.length<3?'<details class="qr-add"'+(list?"":" open")+'><summary>채석장 더하기</summary><form id="qrQuarryForm" class="qr-form">'+
           '<label>이름<input name="name" required maxlength="60" placeholder="예: 소설, 졸업 프로젝트"></label><label>한 줄 설명<input name="note" maxlength="150" placeholder="안 적어도 된다"></label>'+
           '<div class="qr-actions"><button type="submit" class="dk-btn">채석장 열기</button></div></form></details>':"")+'</section>'+
-      '<section><h3>돌담 <small>넘긴 덩이가 쌓인 자리</small></h3>'+wall()+'</section>';
+      '<section><h3>돌담 <small>넘긴 덩이가 쌓인 자리</small></h3>'+wall()+'</section>'+
+      '<section><h3>2주 실험 <small>구간을 미리 정하는 방식이 나에게 맞는지 직접 시험한다</small></h3>'+(typeof EXPER!=="undefined"?EXPER.card():"")+'</section>';
   }
+  /* 목차(모자이크): 자리마다 판정에서 놓인 조각. 빈 자리는 빈틈 */
+  function mosaic(q){
+    const slots=(q.outline||"").split("\n").map(v=>v.trim()).filter(Boolean); if(!slots.length) return "";
+    const placed=q.placed||[];
+    return '<ol class="qr-mosaic">'+slots.map(sl=>{ const ps=placed.filter(p=>p.slot===sl);
+      return '<li data-filled="'+(ps.some(p=>p.ok)?1:0)+'"><b>'+h(sl)+'</b>'+(ps.length?ps.map(p=>'<small>'+(p.ok?"":"△ ")+h(p.t)+' · '+md(p.date)+'</small>').join(""):'<small>빈틈</small>')+'</li>'; }).join("")+'</ol>'+
+      '<p class="qr-soft">'+slots.filter(sl=>!placed.some(p=>p.slot===sl&&p.ok)).length+'자리가 비어 있다. 조각을 더 만들기보다 잇는 일이 급한지 본다.</p>';
+  }
+  function quarryForm(q){
+    return '<form class="qr-form qr-qform" data-q="'+h(q.id)+'"><label>당분간 유지할 가정 <small>처음 세운 구상 가운데 지금 붙들고 갈 것</small><input name="keep" maxlength="160" value="'+h(q.keep||"")+'" placeholder="예: 주인공은 끝까지 집을 떠나지 않는다"></label>'+
+      '<div class="qr-two"><label>다시 볼 날<input name="review" type="date" value="'+h(q.review||shift(today(),28))+'"></label><label>바꿀 기준<input name="crit" maxlength="120" value="'+h(q.crit||"")+'" placeholder="예: 세 장을 써도 장면이 안 서면"></label></div>'+
+      '<label>목차 <small>한 줄에 한 자리. 조각을 판정할 때 이 자리 가운데서 고른다</small><textarea name="outline" rows="4" maxlength="1200" placeholder="1장 · 문턱&#10;2장 · 비탈길&#10;3장 · 차 안">'+h(q.outline||"")+'</textarea></label>'+
+      '<div class="qr-actions"><button type="submit" class="dk-btn dk-go">저장</button>'+btn("취소","cancelq",q.id)+'</div></form>';
+  }
+  /* 조각 판정 ③에서 고른 자리에 조각을 놓는다(desk.js가 부른다) */
+  function place(date,slot,t,ok,qid){
+    const q=qid?JOURNEY.quarries().find(v=>v.id===qid):quarryOfDate(date); if(!q) return; const qs=JOURNEY.quarries(), x=qs.find(v=>v.id===q.id); if(!x) return;
+    x.placed=[...(x.placed||[]),{slot,t,date,ok:ok?1:0}].slice(-200); saveQs(qs);
+  }
+  /* 그 날짜가 든 주의 덩이가 떼어 온 채석장(덩이 조각의 판정용) */
+  function quarryOfDate(date){ const c=JOURNEY.cut(JOURNEY.week(date).monday); return c?JOURNEY.quarries().find(q=>q.id===c.q)||null:null; }
   const say=text=>{ msg=text; const m=$("qrMsg"); if(m){ m.textContent=text; m.focus({preventScroll:true}); } };
   function done(text){ msg=text; mode=null; armed=""; sync(); WEEK.refresh(); if(ov.hidden) return; render(); ov.scrollTop=0; $("qrMsg").focus({preventScroll:true}); }
 
@@ -169,6 +211,12 @@ const QUARRY=(()=>{
       save(value,Object.assign(c,{state:"dropped",closedAt:today(),used:pieces(value).k})); return done("이 덩이는 여기서 닫는다."); }
     if(a==="desk"){ close(); return DESK.open(isToday()&&nowId()?nowId():sel); }
     const qs=JOURNEY.quarries(), q=qs.find(x=>x.id===value);
+    if(a==="editq"&&q){ editQ=q.id; msg=""; render(); return box.querySelector('.qr-qform [name="keep"]').focus(); }
+    if(a==="cancelq"){ editQ=""; return render(); }
+    if(a==="keepq"&&q){ q.review=shift(today(),28); saveQs(qs); return done("가정을 그대로 두고 "+md(q.review)+"에 다시 본다."); }
+    if(a==="donerv"||a==="laterrv"){ const rv=JOURNEY.reviews(), i=+value; if(!rv[i]) return;
+      if(a==="donerv") rv.splice(i,1); else rv[i].date=shift(today(),7);
+      Promise.resolve(JOURNEY.saveReviews(rv)).catch(err=>console.error(err)); return done(a==="donerv"?"따져 본 질문을 지웠다.":"1주 뒤에 다시 본다."); }
     if(a==="rest"&&q){ q.rest=q.rest?0:1; saveQs(qs); return done(q.rest?"채석장을 쉬게 두었다.":"채석장을 다시 열었다."); }
     if(a==="delq"&&q){ if(armed!=="del"+value){ armed="del"+value; return render(); }
       saveQs(qs.filter(x=>x.id!==value)); return done("채석장을 지웠다. 쌓은 돌은 돌담에 남는다."); }
@@ -187,6 +235,11 @@ const QUARRY=(()=>{
       qs.push({id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),name,note:text("note"),rest:0});
       saveQs(qs); return done("채석장을 열었다. 이제 여기서 덩이를 뗀다.");
     }
+    if(e.target.classList.contains("qr-qform")){
+      const qs=JOURNEY.quarries(), q=qs.find(x=>x.id===e.target.dataset.q); if(!q) return;
+      Object.assign(q,{keep:text("keep"),review:text("review"),crit:text("crit"),outline:String(f.get("outline")??"").split("\n").map(v=>v.trim()).filter(Boolean).slice(0,40).join("\n")});
+      saveQs(qs); editQ=""; return done("가정과 목차를 적었다."+(q.review?" "+md(q.review)+"에 다시 본다.":""));
+    }
     if(e.target.id!=="qrCutForm"||!mode) return;
     const {kind,week,previous}=mode, editing=kind==="edit", shrinking=kind==="shrink", old=JOURNEY.cut(shrinking?previous:week);
     const q=text("quarry"), t=text("title"), end=text("end"), to=text("to"), due=text("due"), est=+text("est");
@@ -199,5 +252,5 @@ const QUARRY=(()=>{
   });
   JOURNEY.onChange(sync);   // db에서 덩이가 새로 왔을 수 있다
 
-  return { sync, open, openCutFor, stoneSvg, pieces };
+  return { sync, open, openCutFor, stoneSvg, pieces, place, quarryOfDate, dueReviews };
 })();

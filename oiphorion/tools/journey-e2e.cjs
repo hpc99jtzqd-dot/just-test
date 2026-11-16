@@ -376,6 +376,73 @@ test('V5 채석장: 못 닫은 덩이는 일요일에 더 작게 자르거나 �
   assert.equal(await p.evaluate(() => JSON.stringify(JOURNEY.week())), before, '한 주 판정은 그대로');
 }));
 
+test('V6 멈춤과 판정: +5분 없음, 시간이 끝나면 마침 기록, 다음 날 아침 세 가지 판정, 부담 두 번 연속 8 이상이면 쉬어 가기', () => session('2026-11-17T19:10', { fixture: 'keep', documents: { ...QDOCS,
+  [BASE + 'days/2026-11-17']: { woke: '07:30', line: 1, savedAt: 1 },
+  [BASE + 'plans/2026-11-16']: { b: { hobby: { s: 1200, p: [{ m: 50, t: '어제 조각', n: '', d: 1, r: 0, c: 0, f: 1, b: 9, nx: '3번 단락 첫 문장부터', sl: 0, j: '', pl: '', x: -1 }] } }, park: [], savedAt: 5 } } }, async (p, db) => {
+  await p.locator('#nowStrip button').click();
+  assert.equal(await p.locator('#dkPlus5').count(), 0, '시간을 늘리는 단추가 없다');
+  assert.equal(await p.locator('#dkJudge .dk-jrow').count(), 1, '어제 조각 판정');
+  const jr = p.locator('#dkJudge .dk-jrow').first();
+  await jr.locator('button[type="submit"]').click();
+  assert.equal(await p.locator('#dkJudge .dk-jrow').count(), 1, '셋 다 골라야 저장된다');
+  for (const k of [0, 1, 2]) await jr.locator(`input[name="q${k}"][value="1"]`).check({ force: true });
+  await jr.locator('button[type="submit"]').click();
+  await until(() => db.get('plans/2026-11-16')?.b?.hobby?.p?.[0]?.j === '111', '판정 저장');
+  await p.locator('#dkQuick [data-q="add"]').click();
+  await p.locator('#dkList .dk-row').nth(0).locator('.dk-title').fill('오늘 조각');
+  assert.match(await p.locator('#dkFirst').innerText(), /3번 단락 첫 문장부터/, '지난번 첫 행동이 보인다');
+  await p.clock.setFixedTime(fixedTime('2026-11-17T19:36'));
+  await until(() => p.locator('#dkFin').isVisible(), '시간이 끝나면 마침 기록');
+  assert.match(await p.locator('#dkFinHead').innerText(), /정해 둔 시각이다\. 여기서 멈춘다/);
+  await p.locator('#dkBurden [data-b="8"]').click();
+  await p.fill('#dkFinNext', '예제 7부터');
+  await p.locator('#dkFin button[type="submit"]').click();
+  await until(() => db.get('plans/2026-11-17')?.b?.hobby?.p?.[0]?.f === 1, '마침 기록 저장');
+  const x = db.get('plans/2026-11-17').b.hobby.p[0];
+  assert.deepEqual([x.b, x.nx, x.d], [8, '예제 7부터', 0], '미완성이어도 기록하고 손을 뗀다');
+  assert.match(await p.locator('#dkWarn').innerText(), /두 번 연속 8 이상/, '쉬어 가기 알림');
+  await p.fill('#dkParkIn', '이 소설을 계속 써야 하나'); await p.locator('#dkParkReview').check(); await p.press('#dkParkIn', 'Enter');
+  await until(() => db.get('meta/quarries')?.reviews?.length === 1, '목적이 의심되는 질문은 다시 볼 날로');
+  assert.equal(db.writeCount('days/2026-11-17'), 0, '판정 기록은 건드리지 않음');
+}));
+test('V6 2주 실험: 동전으로 순서, B는 구간을 먼저, 기록 뒤 다음 날 판정, 부담 연속 8 이상이면 멈춤', () => session('2026-11-17T19:10', { fixture: 'keep', documents: { ...QDOCS, [BASE + 'days/2026-11-17']: { woke: '07:30', line: 1, savedAt: 1 } } }, async (p, db) => {
+  await p.locator('#cutStrip [data-qa="open"]').click();
+  await p.locator('#qrBody [data-xa="open"]').click();
+  await p.fill('#exSetup [name="goal"]', '사례 단락 여덟 개');
+  for (let n = 0; n < 8; n++) await p.fill(`#exSetup [name="t${n}"]`, '단락 ' + (n + 1));
+  await p.locator('#exSetup button[type="submit"]').click();
+  await until(() => db.get('meta/experiment')?.s?.length === 8, '실험 저장');
+  const ex = db.get('meta/experiment');
+  for (let k = 0; k < 4; k++) assert.notEqual(ex.s[2 * k].m, ex.s[2 * k + 1].m, '쌍마다 A와 B가 한 번씩');
+  if (ex.s[0].m === 'B') {
+    assert.equal(await p.locator('#exBody [data-xa="desk"]').count(), 0, 'B는 구간을 먼저 정해야 책상에 올린다');
+    await p.fill('.ex-plan [name="part"]', '첫 사례 한 단락'); await p.fill('.ex-plan [name="cond"]', '주장과 근거가 있는 단락 1개');
+    await p.locator('.ex-plan button[type="submit"]').click();
+  }
+  await p.locator('#exBody [data-xa="desk"]').click();
+  assert.equal(await p.locator('#deskOv').isVisible(), true);
+  assert.equal(await p.locator('#dkList .dk-row').count(), ex.s[0].m === 'B' ? 4 : 2, '시간 배분대로 조각이 올라간다');
+  await p.keyboard.press('Escape');
+  const rec = async (burden) => {
+    await p.locator('#cutStrip [data-xa="open"]').click();
+    if (await p.locator('.ex-plan').count()) { await p.fill('.ex-plan [name="part"]', '구간'); await p.fill('.ex-plan [name="cond"]', '조건'); await p.locator('.ex-plan button[type="submit"]').click(); }
+    await p.locator('#exBody [data-xa="rec"]').click();
+    await p.locator('.ex-rec input[name="ontime"][value="1"]').check({ force: true });
+    await p.locator(`.ex-rec input[name="burden"][value="${burden}"]`).check({ force: true });
+    await p.fill('.ex-rec [name="next"]', '다음 단락 파일을 연다');
+    await p.locator('.ex-rec button[type="submit"]').click();
+  };
+  await rec(8);
+  assert.match(await p.locator('#cutStrip').innerText(), /실험 2\/8/);
+  await p.keyboard.press('Escape');
+  await rec(9);
+  assert.match(await p.locator('#exMsg').innerText(), /즉시 멈춘다/, '부담 두 회차 연속 8 이상');
+  assert.equal(await p.locator('#exBody [data-xa="stop"]').count(), 1);
+  await p.locator('#exBody [data-xa="stop"]').click();
+  await until(() => db.get('meta/experiment')?.state === 'stop', '멈춤 저장');
+  assert.equal(db.get('meta/experiment').s.filter(v => v.rec).length, 2, '기록은 지우지 않는다');
+}));
+
 (async () => {
   let failed = 0;
   browser = await chromium.launch({ args });

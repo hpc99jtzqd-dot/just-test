@@ -17,7 +17,7 @@ body:not(.journey-day) .cut-strip,body:not(.journey-day) .now-strip{display:none
 .dk-cuttog small{color:var(--ink-soft)}
 .dk-cutline{font-size:13.5px;color:var(--ink-soft)}
 .dk-cutline.over{color:#b8301f;font-weight:600}
-#quarryOv{background:rgba(12,30,64,.78);align-items:flex-start;overflow:auto;overscroll-behavior:contain}
+#quarryOv,#expOv{background:rgba(12,30,64,.78);align-items:flex-start;overflow:auto;overscroll-behavior:contain}
 .qr-body{display:flex;flex-direction:column;gap:14px;font-size:15px;line-height:1.5}
 .qr-body section{display:flex;flex-direction:column;gap:8px;padding-top:14px;border-top:1px solid rgba(16,36,63,.12)}
 .qr-body h3 small,.qr-body legend small,.qr-form label small{font-family:var(--f-body);font-size:12.5px;font-weight:400;color:var(--ink-soft);margin-left:6px}
@@ -62,3 +62,98 @@ body:not(.journey-day) .cut-strip,body:not(.journey-day) .now-strip{display:none
 .qr-wall time{font-size:11.5px;color:var(--ink-soft);font-variant-numeric:tabular-nums}
 .qr-wall small{font-size:11.5px;color:var(--ink-soft)}
 @media (max-width:420px){.qr-two{grid-template-columns:1fr}}
+
+/* ── 책상: 마침 기록 · 물러나기 · 어제 조각 판정 · 생각의 둑 ── */
+.dk-first{font-size:14px;color:#d7ebff;margin-top:6px!important}
+.dk-fin{display:flex;flex-direction:column;gap:10px;margin-top:12px;padding:14px;border-radius:14px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25)}
+.dk-fin-head{font-family:var(--f-game);font-size:18px}
+.dk-fin-sub{font-size:13.5px;color:#d7ebff}
+.dk-burden{border:0;margin:0;padding:0}
+.dk-burden legend{font-size:13.5px;padding:0;margin-bottom:6px}
+.dk-burden legend small{opacity:.8;margin-left:4px}
+.dk-burden-row{display:grid;grid-template-columns:repeat(11,minmax(0,1fr));gap:4px}
+.dk-burden-row button,.dk-burden-row label span{display:flex;align-items:center;justify-content:center;min-height:36px;border-radius:8px;border:1px solid currentColor;background:transparent;color:inherit;font:600 14px var(--f-body);cursor:pointer;font-variant-numeric:tabular-nums}
+.dk-burden-row button[aria-pressed="true"],.dk-burden-row input:checked+span{background:#fff;color:#0b2a4f;border-color:#fff}
+.dk-burden-row button.hi[aria-pressed="true"],.dk-burden-row .hi input:checked+span{background:#ffd9a0;border-color:#ffd9a0;color:#5a2a00}
+.dk-burden-row label{position:relative}
+.dk-burden-row label input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer}
+.dk-burden-row input:focus-visible+span,.dk-burden-row button:focus-visible{outline:3px solid var(--aqua);outline-offset:2px}
+.dk-fin-next{display:flex;flex-direction:column;gap:4px;font-size:13.5px}
+.dk-fin-next input{font:inherit;font-size:16px;color:var(--ink);background:#fff;border:0;border-radius:10px;padding:8px 10px}
+.dk-fin-chk{display:flex;align-items:center;gap:8px;font-size:13.5px;cursor:pointer;min-height:30px}
+.dk-fin-chk input{width:17px;height:17px;margin:0}
+.dk-back{font-size:14px;color:#eaf5ff;background:rgba(255,255,255,.08);border-radius:12px;padding:10px 12px;margin-top:10px!important}
+.dk-back .dk-btn{margin-left:6px}
+.dk-judge{display:flex;flex-direction:column;gap:10px}
+.dk-judge h3 small{font-family:var(--f-body);font-size:12.5px;color:var(--ink-soft);margin-left:6px}
+.dk-jrow{display:flex;flex-direction:column;gap:8px;padding:12px 14px;border-radius:14px;background:#fff;border:1px solid rgba(16,36,63,.12)}
+.dk-jname small{color:var(--ink-soft);font-variant-numeric:tabular-nums}
+.dk-q{border:0;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.dk-q legend{font-size:14px;padding:0;margin-bottom:4px;width:100%}
+.dk-q legend small,.ex-judge legend small{color:var(--ink-soft);font-size:12.5px;margin-left:4px}
+.dk-q label{position:relative}
+.dk-q input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer}
+.dk-q span{display:inline-flex;align-items:center;justify-content:center;min-width:64px;min-height:36px;border-radius:999px;border:1px solid rgba(16,36,63,.22);background:#fff;font-weight:600;font-size:14.5px}
+.dk-q input:checked+span{background:var(--aqua-deep);border-color:var(--aqua-deep);color:#fff}
+.dk-q input:focus-visible+span{outline:3px solid var(--aqua);outline-offset:2px}
+.dk-q select,.ex-judge select{font:inherit;font-size:15px;border:1px solid rgba(16,36,63,.22);border-radius:10px;padding:7px 9px;background:#fff;color:var(--ink);max-width:100%}
+.dk-park-why{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:13.5px;color:var(--ink-soft);cursor:pointer}
+.dk-park-why input[type=checkbox]{width:17px;height:17px;margin:0}
+.dk-park-why input[type=date]{font:inherit;font-size:14px;border:1px solid rgba(16,36,63,.22);border-radius:8px;padding:3px 6px;background:#fff;color:var(--ink)}
+.dk-dike{font-size:13.5px;color:var(--ink-soft)}
+.dk-dike summary{cursor:pointer;color:var(--aqua-deep);font-weight:600;padding:3px 0}
+.dk-dike ul{margin:6px 0;padding-left:1.2em;display:flex;flex-direction:column;gap:3px}
+.dk-dike b{color:var(--ink);font-weight:600}
+.dk-dike p{margin:4px 0 0}
+/* ── 채석장: 다시 볼 날 · 가정 · 목차(모자이크) ── */
+.qr-due ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.qr-due li{padding:10px 14px;border-radius:14px;background:#fff7e6;border:1px solid #f0c88a;display:flex;flex-direction:column;gap:2px}
+.qr-due small{color:var(--ink-soft);font-size:13px}
+.qr-keep{font-size:14px;margin:6px 0 0!important}
+.qr-keep small{color:var(--ink-soft);font-size:12.5px}
+.qr-mosaic{list-style:none;margin:8px 0 0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px}
+.qr-mosaic li{padding:7px 9px;border-radius:8px;border:1px dashed rgba(16,36,63,.25);display:flex;flex-direction:column;gap:1px;font-size:13px;overflow-wrap:anywhere}
+.qr-mosaic li[data-filled="1"]{border:1px solid #6f8068;background:#dfe7d6}
+.qr-mosaic small{font-size:11.5px;color:var(--ink-soft)}
+.qr-form textarea{font:inherit;font-size:15px;color:var(--ink);background:#fff;border:1px solid rgba(16,36,63,.22);border-radius:10px;padding:8px 10px;width:100%;resize:vertical}
+.qr-qform{margin-top:8px;padding:12px;border-radius:12px;background:#f4f8fc}
+.cs-exp{display:inline-flex;align-items:center;gap:6px;flex:1 1 100%;font-size:13px;color:var(--ink-soft)}
+/* ── 2주 실험 ── */
+.ex-pair{border:1px solid rgba(16,36,63,.12);border-radius:12px;padding:8px 12px 10px;margin:0;display:flex;flex-direction:column;gap:6px}
+.ex-pair legend{font-size:14px;font-weight:600;padding:0 4px}
+.ex-pair legend small{font-weight:400;color:var(--ink-soft);font-size:12.5px}
+.ex-task{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px}
+.ex-task select{width:auto!important}
+.ex-list{list-style:none;margin:0;padding:0;border-radius:14px;background:#fff;border:1px solid rgba(16,36,63,.1);overflow:hidden}
+.ex-row{display:grid;grid-template-columns:1.8em 2.6em 1.8em minmax(0,1fr) auto;gap:8px;align-items:center;padding:9px 12px;border-bottom:1px solid rgba(16,36,63,.07);font-size:14.5px}
+.ex-row:last-child{border-bottom:0}
+.ex-row.now{background:#e6f5fc}
+.ex-row.ok .ex-task-t{font-weight:700}
+.ex-n{font-weight:700;font-variant-numeric:tabular-nums}
+.ex-pairn,.ex-st{font-size:12.5px;color:var(--ink-soft);font-variant-numeric:tabular-nums}
+.ex-m{display:inline-flex;justify-content:center;border-radius:6px;font-weight:700;font-size:13px;padding:1px 0;background:#e9eef3}
+.ex-m[data-m="B"]{background:#0b6d9c;color:#fff}
+.ex-task-t{min-width:0;overflow-wrap:anywhere}
+.ex-task-t small{color:var(--ink-soft);font-size:12px}
+.ex-cur .qr-form{margin-top:4px}
+.ex-stop{background:#fff1ee;border:1px solid #f0a99a;border-radius:14px;padding:12px 14px!important}
+.ex-mid{background:#f2f7ec;border-radius:14px;padding:12px 14px!important;border:1px solid #c5d6b5}
+.ex-tab{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums;background:#fff;border-radius:12px;overflow:hidden}
+.ex-tab caption{text-align:left;font-size:13px;color:var(--ink-soft);padding:4px 0}
+.ex-tab th,.ex-tab td{padding:8px 10px;border-bottom:1px solid rgba(16,36,63,.08);text-align:left}
+.ex-tab thead th{font-size:13px;color:var(--ink-soft);font-weight:600}
+.ex-tab td small{color:var(--ink-soft)}
+.ex-rule{font-size:14px;background:#fff;border-radius:12px;padding:10px 12px;border:1px solid rgba(16,36,63,.1)}
+.ex-next{border:0;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.ex-next legend{font-size:14px;font-weight:600;margin-bottom:4px;padding:0}
+.ex-next label{display:flex;gap:10px;align-items:flex-start;padding:9px 12px;border-radius:12px;background:#fff;border:1px solid rgba(16,36,63,.12);cursor:pointer;font-size:14px}
+.ex-next input{margin-top:3px;flex:none;width:17px;height:17px}
+.ex-next label:has(input:checked){border-color:var(--aqua-deep);background:#e6f5fc}
+.ex-changes{margin:0;padding-left:1.2em;font-size:13.5px}
+.ex-chg{flex-direction:row!important;align-items:flex-end}
+.ex-inline{flex:1}
+.ex-end{justify-content:flex-end}
+.ex-judge .qr-est{gap:6px}
+@media (max-width:560px){.dk-burden-row{grid-template-columns:repeat(6,minmax(0,1fr))}.ex-row{grid-template-columns:1.6em 2.4em 1.8em minmax(0,1fr)}.ex-st{grid-column:4}}
+.dk-focus.finning>:is(.dk-cap,.dk-cur,.dk-clock,.dk-bar,.dk-next,.dk-first,.dk-toast){display:none}
+.dk-focus.finning .dk-fin{margin-top:0}
