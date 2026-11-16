@@ -18,6 +18,7 @@
       <button type="button" class="wk-pending" id="wkPending" hidden>지난 일요일 점프 보기</button>
       <output class="route" id="route" for="wake woke" data-line="1" aria-live="polite"></output>
       <div class="now-strip" id="nowStrip" hidden></div>
+      <div class="cut-strip" id="cutStrip"></div>
     </section>
   </header>
 
@@ -35,6 +36,7 @@
         <p class="wk-offline" id="wkOffline" hidden>기록이 저장되지 않아요 (claude.ai에서 로그인 상태로 열어야 기기 간에 이어져요)</p>
         <ol class="wk-days" id="wkDays"></ol>
         <p class="wk-status" id="wkStatus" aria-live="polite"></p>
+        <div class="wk-cut" id="wkCut"></div>
         </div>
       </div>
       <div class="wk-jump" id="wkJump" hidden role="dialog" aria-label="일요일 점프" aria-live="polite">
@@ -186,6 +188,7 @@
       <div class="dk-quick" id="dkQuick" role="group" aria-label="조각 더하기">
         <button type="button" class="dk-btn" data-q="add">+ 조각</button>
         <button type="button" class="dk-btn" data-q="rest">+ 쉼 10분</button>
+        <button type="button" class="dk-btn" data-q="cut" id="dkAddCut" hidden>+ 덩이 조각</button>
         <span class="dk-fill" id="dkFill">
           <span class="dk-sep" id="dkFillCap"></span>
           <button type="button" class="dk-btn" data-q="n2">2등분</button>
@@ -195,6 +198,7 @@
           <button type="button" class="dk-btn" data-q="25">25분+쉼</button>
         </span>
       </div>
+      <p class="dk-cutline" id="dkCutLine" hidden></p>
     </section>
     <section class="dk-park" aria-label="주차장">
       <h3>주차장 <small>딴생각은 한 줄 세워 두고 조각으로 돌아간다</small></h3>
@@ -205,5 +209,15 @@
       <label class="dk-chime"><input type="checkbox" id="dkChime"> 조각이 끝날 때 소리</label>
       <button type="button" class="dk-link" id="dkClear">조각 전부 지우기</button>
     </footer>
+  </article>
+</div>
+
+<div class="overlay" id="quarryOv" hidden>
+  <article class="desk qr" role="dialog" aria-modal="true" aria-labelledby="qrTitle">
+    <header class="dk-head">
+      <div><h2 id="qrTitle">채석장</h2><p class="dk-meta">긴 것은 붙들어 두고, 한 주에 덩이 하나만 떼어 사람에게 넘긴다</p></div>
+      <button type="button" class="dk-x" id="qrClose" data-qa="close" aria-label="채석장 닫기">✕</button>
+    </header>
+    <div class="qr-body" id="qrBody"></div>
   </article>
 </div>

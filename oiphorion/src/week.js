@@ -89,7 +89,8 @@ const WEEK = (() => {
       let today=days[current];if(sun){let record=null;try{record=JSON.parse(store.get("oi.journey.days")||"{}")[JOURNEY.todayKey()];}catch(e){}today={line:record?.line,hatLost:record?.line===2};}
       const mode=JOURNEY.trampolineFor(JOURNEY.todayKey()), tramp=mode==='gone'?'none':today?.line===3?'feet':'back';
       g+=`<svg class="wk-dwarf" data-hat="${today?.hatLost?'0':'1'}" data-tramp="${tramp}" x="${pos[0]-15}" y="${pos[1]-6}" width="30" height="40" viewBox="0 0 40 54">${document.getElementById('dwarf').innerHTML}</svg>`;
-    }else svg.setAttribute("viewBox","0 0 400 310");
+      g+=QUARRY.stoneSvg(sections[5].screen[0]+16,sections[5].screen[1]+14);   // 토요일 자리의 덩이 돌
+    }else{ svg.setAttribute("viewBox","0 0 400 310"); const [qx,qy]=mid(5); g+=QUARRY.stoneSvg(qx+20,qy+14); }
     svg.innerHTML = g;
 
     daysEl.innerHTML = days.map((d, i) => {
@@ -148,5 +149,5 @@ const WEEK = (() => {
   JOURNEY.onChange(() => { if (open) render(); else $("wkPending").hidden = !JOURNEY.progress().pendingJump; });
   JOURNEY.ready.then(() => { $("wkPending").hidden = !JOURNEY.progress().pendingJump; if (open) render(); });
   window.addEventListener("resize",()=>{if(open)setTimeout(render,240);});
-  return { show, hide, playJump };
+  return { show, hide, playJump, refresh() { if (open) render(); } };   // refresh: 덩이를 넘기거나 닫았을 때 토요일 돌을 다시 그린다
 })();

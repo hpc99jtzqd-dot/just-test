@@ -17,11 +17,18 @@
    JOURNEY.plan(key)                  그날의 책상 계획(블록 조각·주차장) 객체. 없으면 null. 모양은 desk.js가 정한다
    JOURNEY.savePlan(key, obj)         그날 책상 계획 저장(이 기기 + db). savedAt을 채운다. 판정과는 무관. Promise
    JOURNEY.refreshPlan(key)           db에서 그날 계획을 다시 읽는다(다른 기기에서 고친 것 받기). 바뀌었으면 true. Promise
+   JOURNEY.quarries()                 채석장(긴 작업) 목록 [{id,name,note,rest}]. 모양은 quarry.js가 정한다
+   JOURNEY.saveQuarries(list)         채석장 목록 저장(이 기기 + db). Promise
+   JOURNEY.cut(monday)                그 주의 덩이. 없으면 null
+   JOURNEY.saveCut(monday, obj)       그 주의 덩이 저장. savedAt을 채운다. 판정과는 무관. Promise
+   JOURNEY.cuts()                     읽어 둔 모든 주의 덩이 {월요일: 덩이} (돌담용, 복사본)
 
    저장(문서 경로는 짝수 칸): data/users/<id>/journey/days/<YYYY-MM-DD> = {woke, line, savedAt}
                               data/users/<id>/journey/meta/since      = {day}     처음 연 날
                               data/users/<id>/journey/meta/jumpSeen   = {monday}  본 점프의 월요일
                               data/users/<id>/journey/plans/<YYYY-MM-DD> = {b, park, savedAt}  책상 계획(이번 주 것만 읽는다)
+                              data/users/<id>/journey/meta/quarries   = {list, savedAt}        채석장 목록
+                              data/users/<id>/journey/cuts/<월요일>     = {q,t,end,to,due,est,state,closedAt,used,savedAt}  주마다 덩이 하나
    맵·회차는 저장하지 않고 열 때마다 하루 기록에서 다시 센다(기기 둘이 덮어써도 되돌아가지 않게).
    빈 날 3선도 쓰지 않고 읽을 때 계산한다. since 전의 빈 날은 3선으로 치지 않는다.
 */
@@ -43,6 +50,7 @@ const JOURNEY = (() => {
   let days = cacheGet("days", {});
   let since = cacheGet("since", null), jumpSeen = cacheGet("jumpSeen", null);
   let plans = cacheGet("plans", {});   // 책상 계획: 날짜 → {b, park, savedAt}
+  let quarries = cacheGet("quarries", { list: [], savedAt: 0 }), cuts = cacheGet("cuts", {});   // 채석장 · 주마다 덩이
   let prog = Object.assign({ map: 1, round: 1 }, cacheGet("progress", {}), { pendingJump: null });
   let db = null, base = "", gaveUp = false;
   const fns = [];
@@ -87,8 +95,22 @@ const JOURNEY = (() => {
     // 책상 계획은 이번 주(월~일) 것만. 하루 기록과 한 번에 읽어 왕복을 늘리지 않는다
     const pkeys = [];
     for (let i = 0, m = mondayOf(today); i < 7; i++) pkeys.push(addDays(m, i));
-    const [got, pgot] = await Promise.all([Promise.all(keys.map(k => dget(base + "days/" + k))), Promise.all(pkeys.map(k => dget(base + "plans/" + k)))]);
+    // 덩이는 하루 기록을 읽는 주들 + 다음 주(일요일에 미리 떼어 둔 것). 채석장 목록은 한 번
+    const ckeys = [];
+    for (let m = from, last = addDays(mondayOf(today), 7); m <= last; m = addDays(m, 7)) ckeys.push(m);
+    const [got, pgot, cgot, qgot] = await Promise.all([Promise.all(keys.map(k => dget(base + "days/" + k))), Promise.all(pkeys.map(k => dget(base + "plans/" + k))),
+      Promise.all(ckeys.map(k => dget(base + "cuts/" + k))), dget(base + "meta/quarries")]);
     if (gaveUp) return;   // 5초를 넘겼으면 오프라인으로 남는다
+    // 덩이·채석장도 나중에 저장한 쪽이 이긴다
+    const cpush = [];
+    ckeys.forEach((k, i) => {
+      const local = cuts[k], remote = cgot[i];
+      if (remote && (!local || (remote.savedAt || 0) >= (local.savedAt || 0))) cuts[k] = remote;
+      else if (local && local.savedAt) cpush.push(k);
+    });
+    const qpush = !(qgot && (qgot.savedAt || 0) >= (quarries.savedAt || 0)) && quarries.savedAt > 0;
+    if (qgot && !qpush) quarries = { list: Array.isArray(qgot.list) ? qgot.list : [], savedAt: qgot.savedAt || 0 };
+    cacheSet("cuts", cuts); cacheSet("quarries", quarries);
     // 계획은 나중에 저장한 쪽이 이긴다. 이 기기 것이 더 새로우면(오프라인에서 고침) 연결된 뒤 올린다
     const push = [];
     pkeys.forEach((k, i) => {
@@ -109,6 +131,8 @@ const JOURNEY = (() => {
     if (hasLine(cachedToday) && !days[today]) { days[today] = cachedToday; await dset(base + "days/" + today, cachedToday); }
     cacheSet("days", days); cacheSet("since", since); cacheSet("jumpSeen", jumpSeen);
     for (const k of push) await dset(base + "plans/" + k, plans[k]);
+    for (const k of cpush) await dset(base + "cuts/" + k, cuts[k]);
+    if (qpush) await dset(base + "meta/quarries", quarries);
   }
 
   /* 맵·회차: 처음 연 주부터 끝난 주를 차례로 세어 다시 만든다. 온라인일 때만(오프라인은 캐시 값) */
@@ -204,6 +228,20 @@ const JOURNEY = (() => {
       plans[key] = rec;
       cacheSet("plans", plans);
       if (api.online) await dset(base + "plans/" + key, rec);
+    },
+    quarries() { return (quarries.list || []).map(q => Object.assign({}, q)); },
+    async saveQuarries(list) {
+      quarries = { list, savedAt: Date.now() };
+      cacheSet("quarries", quarries);
+      if (api.online) await dset(base + "meta/quarries", quarries);
+    },
+    cut(monday) { return cuts[monday] ? Object.assign({}, cuts[monday]) : null; },
+    cuts() { return JSON.parse(JSON.stringify(cuts)); },
+    async saveCut(monday, obj) {
+      const rec = Object.assign({}, obj, { savedAt: Date.now() });
+      cuts[monday] = rec;
+      cacheSet("cuts", cuts);
+      if (api.online) await dset(base + "cuts/" + monday, rec);
     },
     async refreshPlan(key) {
       if (!api.online) return false;

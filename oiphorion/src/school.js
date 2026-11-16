@@ -70,7 +70,7 @@ const CAMP_SCHOOL = {id:"camp", short:"야영", name:"야영", fixed:true,
 const CLOSE_SCHOOL = {id:"closing", short:"잘 준비", name:"잘 준비", fixed:true,
   story:"불빛을 줄이고, 내일 아침에 쫓기지 않게 옷과 가방을 미리 꺼내 둔다.",
   when:()=>[1380,1440],
-  todo:["화면 끄기","내일 옷·가방 챙기기","내일 할 일 5분 적기"],
+  todo:["화면 끄기","내일 옷·가방 챙기기","내일 할 일 5분 적기","내일 앉을 덩이 조각 하나를 책상에 올려 둔다"],
   pseudo:[{src:"school",from:5,to:34,hl:[31]}],
   cpp:[["school.night","planSchoolDay() · 23:00 마감 안내"],["endOfDay","endOfDay() · 못 푼 건 내일로 넘긴다"]]};
 

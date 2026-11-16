@@ -30,14 +30,15 @@ const DESK=(()=>{
     if(p&&p.b&&typeof p.b==="object") for(const [id,v] of Object.entries(p.b)){
       if(!v||!Array.isArray(v.p)||!v.p.length) continue;
       out.b[id]={s:Number.isFinite(v.s)?v.s:null,p:v.p.filter(x=>x&&typeof x==="object").map(x=>(
-        {m:Math.max(1,Math.min(600,Math.round(num(x.m,25)))),t:String(x.t||"").slice(0,120),n:String(x.n||"").slice(0,2000),d:x.d?1:0,r:x.r?1:0}))};
+        {m:Math.max(1,Math.min(600,Math.round(num(x.m,25)))),t:String(x.t||"").slice(0,120),n:String(x.n||"").slice(0,2000),d:x.d?1:0,r:x.r?1:0,c:x.c?1:0}))};   // c: 이번 주 덩이 조각(quarry.js)
     }
     if(p&&Array.isArray(p.park)) out.park=p.park.filter(x=>x&&typeof x==="object"&&x.t).map(x=>({t:String(x.t).slice(0,200),d:x.d?1:0}));
     return out;
   }
   function doSave(){ saveT=0; const {date,plan}=cur; if(!date) return;
     for(const id of Object.keys(plan.b)) if(!plan.b[id].p.length) delete plan.b[id];
-    Promise.resolve(JOURNEY.savePlan(date,{b:plan.b,park:plan.park})).catch(e=>console.error(e)); }
+    Promise.resolve(JOURNEY.savePlan(date,{b:plan.b,park:plan.park})).catch(e=>console.error(e));
+    QUARRY.sync(); if(dk) cutLine(); }   // 덩이의 진행은 저장된 계획에서 센다
   const dirty=()=>{ clearTimeout(saveT); saveT=setTimeout(doSave,700); };
   const flush=()=>{ if(saveT){ clearTimeout(saveT); doSave(); } };
   function load(date){ if(cur.date!==date){ flush(); cur={date,plan:clean(JOURNEY.plan(date))}; } return cur.plan; }
@@ -84,7 +85,7 @@ const DESK=(()=>{
     if(n){
       let from=a>=0?a:Math.max(0,L.p.findIndex(x=>!x.d)); from=Math.max(0,Math.min(from,n-3));
       h+='<ol class="dk-mini">'+L.p.slice(from,from+3).map((x,k)=>{ const i=from+k, r=L.rows[i];
-        return '<li class="'+(i===a?"now ":"")+(x.d?"done ":"")+(x.r?"rest":"")+'"><label><input type="checkbox" data-i="'+i+'"'+(x.d?" checked":"")+' aria-label="'+esc(nameOf(x))+' 했음">'+
+        return '<li class="'+(i===a?"now ":"")+(x.d?"done ":"")+(x.c?"cut ":"")+(x.r?"rest":"")+'"><label><input type="checkbox" data-i="'+i+'"'+(x.d?" checked":"")+' aria-label="'+esc(nameOf(x))+' 했음">'+
           '<span class="tm">'+hhmm(r.t0)+'</span><span class="tt">'+esc(nameOf(x))+'</span><span class="mm">'+(i===a?Math.ceil((r.t1*60-nowFor(w))/60)+"분 남음":x.m+"분")+'</span></label></li>'; }).join("")+'</ol>';
     }
     const bits=[]; if(n) bits.push("조각 "+work.filter(x=>x.d).length+"/"+work.length+(n>3?" · 전체 "+n+"개":"")); if(park) bits.push("주차장 "+park);
@@ -102,21 +103,30 @@ const DESK=(()=>{
   let openRow=-1;
   function rowHTML(x,i){
     const open=i===openRow, n=i+1;
-    return '<li class="dk-row'+(x.d?" done":"")+(x.r?" rest":"")+(open?" open":"")+'" data-i="'+i+'">'+
+    return '<li class="dk-row'+(x.d?" done":"")+(x.r?" rest":"")+(x.c?" cut":"")+(open?" open":"")+'" data-i="'+i+'">'+
       '<label class="dk-chk"><input type="checkbox"'+(x.d?" checked":"")+' aria-label="'+n+'번 조각 했음"><i aria-hidden="true">✓</i></label>'+
       '<button type="button" class="dk-sum" aria-expanded="'+open+'"><span class="dk-time"></span><span class="dk-what"><span class="dk-name"></span><span class="dk-memo"></span></span><span class="dk-len"></span></button>'+
       (open?'<div class="dk-edit">'+
         '<div class="dk-edit-top"><input class="dk-title" type="text" maxlength="120" value="'+esc(x.t)+'" placeholder="'+(x.r?"쉼":"무엇을 할까")+'" aria-label="'+n+'번 조각 할 일" enterkeyhint="next">'+
         '<label class="dk-minw"><input class="dk-min" type="number" inputmode="numeric" min="1" max="600" step="5" value="'+x.m+'" aria-label="'+n+'번 조각 길이(분)"><span>분</span></label></div>'+
         '<textarea class="dk-note" rows="1" maxlength="2000" placeholder="메모 (쪽수, 막힌 곳, 다음에 이어갈 곳)" aria-label="'+n+'번 조각 메모">'+esc(x.n)+'</textarea>'+
+        (dkCut||x.c?'<label class="dk-cuttog"><input type="checkbox" data-cut="1"'+(x.c?" checked":"")+'> 이번 주 덩이 조각'+(dkCut?' <small>'+esc(dkCut.t)+'</small>':"")+'</label>':"")+
         '<div class="dk-tools"><button type="button" data-act="split">반으로 쪼개기</button><button type="button" data-act="up"'+(i?"":" disabled")+'>위로</button>'+
         '<button type="button" data-act="del">지우기</button><button type="button" data-act="close" class="dk-ok">됐음</button></div></div>':"")+
       '</li>';
   }
   const grow=ta=>{ ta.style.height="auto"; ta.style.height=Math.min(ta.scrollHeight+2,220)+"px"; };
   /* open: 펼칠 줄(없으면 다 접는다). 펼친 줄의 할 일 칸에 커서를 둔다 */
+  /* 이번 주에 열린 덩이가 있으면 책상에서 조각에 '덩이 조각' 표시를 할 수 있다. 진행 한 줄과 '+ 덩이 조각' 단추 */
+  let dkCut=null;
+  function cutLine(){
+    dkCut=QUARRY.openCutFor(dk.date);
+    $("dkAddCut").hidden=!dkCut; const el=$("dkCutLine"); el.hidden=!dkCut; if(!dkCut) return;
+    const over=dkCut.n>dkCut.est; el.classList.toggle("over",over);
+    put(el,"◆ 이번 주 덩이 · "+dkCut.t+" · 조각 "+dkCut.k+"/"+dkCut.est+(over?" · 세 번 앉을 크기를 넘는다. 늘리지 말고 더 자른다.":""));
+  }
   function renderList(open){
-    const bp=cur.plan.b[dk.id], p=bp?bp.p:[];
+    const bp=cur.plan.b[dk.id], p=bp?bp.p:[]; cutLine();
     openRow=open!=null&&open>=0&&open<p.length?open:-1;
     list.innerHTML=p.map(rowHTML).join(""); list.hidden=!p.length;
     list.querySelectorAll(".dk-note").forEach(grow);
@@ -191,8 +201,9 @@ const DESK=(()=>{
     dirty(); paint();
   });
   list.addEventListener("change",e=>{
-    const li=e.target.closest(".dk-row"); if(!li||e.target.type!=="checkbox") return;
-    cur.plan.b[dk.id].p[+li.dataset.i].d=e.target.checked?1:0; li.classList.toggle("done",e.target.checked); dirty(); paint();
+    const li=e.target.closest(".dk-row"); if(!li||e.target.type!=="checkbox") return; const x=cur.plan.b[dk.id].p[+li.dataset.i];
+    if(e.target.dataset.cut){ x.c=e.target.checked?1:0; li.classList.toggle("cut",e.target.checked); dirty(); flush(); return; }
+    x.d=e.target.checked?1:0; li.classList.toggle("done",e.target.checked); dirty(); paint(); if(x.c) flush();
   });
   list.addEventListener("click",e=>{
     const li=e.target.closest(".dk-row"); if(!li) return; const i=+li.dataset.i;
@@ -215,13 +226,14 @@ const DESK=(()=>{
   $("dkQuick").addEventListener("click",e=>{
     const q=e.target.closest("[data-q]"); if(!q) return; const b=block(), kind=q.dataset.q;
     const bp=ensure(b), L=layout(b), at0=bp.p.length; let left=L.left;
-    const push=(m,r)=>bp.p.push({m,t:r?"쉼":"",n:"",d:0,r:r?1:0});
+    const push=(m,r)=>bp.p.push({m,t:r?"쉼":"",n:"",d:0,r:r?1:0,c:0});
     if(kind==="add") push(left>=5&&left<25?left:25);
+    else if(kind==="cut"){ if(!dkCut) return; bp.p.push({m:25,t:dkCut.t,n:"",d:0,r:0,c:1}); }   // 덩이 제목이 채워진 25분 조각
     else if(kind==="rest") push(10,1);
     else if(/^n\d$/.test(kind)){ const k=+kind[1]; if(left<10) return; const base=Math.max(5,Math.floor(left/k/5)*5); for(let i=0;i<k-1;i++) push(base); push(Math.max(1,left-base*(k-1))); }
     else { const work=+kind, rest=work>=50?10:5, tail=work>=50?15:10; if(left<10) return;   // 공부 work분 + 쉼 rest분을 되풀이
       while(left>=10){ let m=Math.min(work,left); if(left-m>0&&left-m<tail) m=left; push(m); left-=m; if(left>=rest+tail){ push(rest,1); left-=rest; } } }
-    dirty(); renderList(bp.p.findIndex((x,i)=>i>=at0&&!x.r));
+    dirty(); if(kind==="cut") flush(); renderList(bp.p.findIndex((x,i)=>i>=at0&&!x.r));
   });
   $("dkClear").addEventListener("click",e=>{ const q=e.currentTarget;   // 두 번 눌러야 지운다
     if(clearArm&&Date.now()-clearArm<4000){ delete cur.plan.b[dk.id]; clearArm=0; q.textContent="조각 전부 지우기"; dirty(); renderList(); }

@@ -317,6 +317,65 @@ test('V4 오늘 기록이 없으면 단추 한 번으로 적는다', () => sessi
   assert.equal(await nudge.isVisible(), false);
 }));
 
+const QDOCS = { [BASE + 'meta/quarries']: { list: [{ id: 'q0', name: '소설', note: '', rest: 0 }], savedAt: 5 } };
+test('V5 채석장: 덩이를 떼고, 책상 조각으로 진행을 세고, 넘기면 돌담에 돌 · 판정 기록은 그대로', () => session('2026-11-17T19:10', { fixture: 'keep', documents: { ...QDOCS, [BASE + 'days/2026-11-16']: { woke: '07:30', line: 1, savedAt: 1 }, [BASE + 'days/2026-11-17']: { woke: '07:30', line: 1, savedAt: 1 } } }, async (p, db) => {
+  const tramp = await p.evaluate(() => JOURNEY.trampolineFor());
+  assert.match(await p.locator('#cutStrip').innerText(), /이번 주 덩이가 아직 없다/);
+  await p.locator('#cutStrip button').click();
+  assert.equal(await p.locator('#quarryOv').isVisible(), true);
+  await p.locator('#qrBody [data-qa="new"]').click();
+  await p.fill('#qrCutForm [name="title"]', '차 안 문단');
+  await p.fill('#qrCutForm [name="end"]', '합평에 낼 한 쪽');
+  await p.fill('#qrCutForm [name="to"]', '합평회');
+  assert.equal(await p.inputValue('#qrCutForm [name="due"]'), '2026-11-21', '넘길 날 기본은 토요일');
+  await p.locator('#qrCutForm button[type="submit"]').click();
+  await until(() => db.get('cuts/2026-11-16')?.state === 'open', '덩이가 db에 저장됨');
+  assert.equal(db.get('cuts/2026-11-16').est, 2);
+  await p.locator('#qrBody [data-qa="desk"]').click();
+  assert.equal(await p.locator('#deskOv').isVisible(), true);
+  for (let i = 0; i < 3; i++) await p.locator('#dkAddCut').click();
+  assert.equal(await p.locator('#dkList .dk-row.cut').count(), 3);
+  assert.match(await p.locator('#dkCutLine').innerText(), /세 번 앉을 크기를 넘는다/, '예상(2)보다 많이 올리면 알려 준다');
+  await p.locator('#dkList .dk-row').nth(2).locator('[data-act="del"]').click();   // 방금 넣은 줄은 펼쳐져 있다
+  await p.locator('#dkList .dk-row').nth(0).locator('.dk-chk input').check({ force: true });
+  await until(async () => /조각 1\/2$/.test(await p.locator('#dkCutLine').innerText()), '책상에서 진행이 세어짐');
+  await until(() => db.get('plans/2026-11-17')?.b?.hobby?.p?.filter(x => x.c === 1).length === 2, '덩이 표시가 저장에 남는다');
+  await p.keyboard.press('Escape');
+  assert.match(await p.locator('#cutStrip').innerText(), /차 안 문단 · 조각 1\/2 · 토요일에 합평회/);
+  await p.click('#wkWeek');
+  assert.match(await p.locator('#wkCut').innerText(), /끝의 모양 · 합평에 낼 한 쪽/);
+  assert.equal(await p.locator('.wk-stone[data-state="open"]').count(), 1, '토요일 자리에 윤곽 돌');
+  await p.locator('#wkCut [data-qa="hand"]').click();
+  await until(() => db.get('cuts/2026-11-16')?.state === 'handed', '넘겼음이 저장됨');
+  assert.equal(db.get('cuts/2026-11-16').used, 1);
+  assert.equal(await p.locator('.wk-stone[data-state="handed"]').count(), 1, '채운 돌');
+  await p.locator('#wkCut [data-qa="open"]').click();
+  assert.equal(await p.locator('.qr-wall li[data-stone="1"]').count(), 1);
+  assert.equal(await p.locator('#qrBody [data-qa="new"]').count(), 0, '한 주에 덩이는 하나');
+  assert.equal(db.writeCount('days/2026-11-17'), 0, '기상 기록은 건드리지 않음');
+  assert.equal(await p.evaluate(() => JOURNEY.trampolineFor()), tramp, '트램펄린 판정과 무관');
+}));
+test('V5 채석장: 못 닫은 덩이는 일요일에 더 작게 자르거나 버린다 · 같은 크기로 미루지 않는다', () => session('2026-11-22T10:00', { fixture: 'keep', documents: { ...QDOCS,
+  [BASE + 'cuts/2026-11-16']: { q: 'q0', t: '2장 초고', end: '2장 전체', to: '합평회', due: '2026-11-21', est: 3, state: 'open', closedAt: null, savedAt: 5 } } }, async (p, db) => {
+  const before = await p.evaluate(() => JSON.stringify(JOURNEY.week()));
+  assert.match(await p.locator('#cutStrip').innerText(), /열린 채 주가 지난 덩이/);
+  await p.locator('#cutStrip button').click();
+  assert.equal(await p.locator('#qrBody [data-qa="hand"]').count(), 0, '지난 뒤에는 넘겼음이 없다');
+  await p.locator('#qrBody [data-qa="shrink"]').click();
+  assert.equal(await p.locator('#qrCutForm [name="est"][value="3"]').isDisabled(), true, '앉을 횟수는 줄여야 한다');
+  await p.fill('#qrCutForm [name="title"]', '2장 첫 장면');
+  await p.fill('#qrCutForm [name="end"]', '2장 전체');
+  await p.locator('#qrCutForm button[type="submit"]').click();
+  assert.match(await p.locator('#qrMsg').innerText(), /좁은 끝의 모양/, '끝의 모양이 같으면 받지 않는다');
+  await p.fill('#qrCutForm [name="end"]', '첫 장면 한 쪽');
+  await p.locator('#qrCutForm button[type="submit"]').click();
+  await until(() => db.get('cuts/2026-11-23')?.state === 'open' && db.get('cuts/2026-11-16')?.state === 'smaller', '지난 덩이는 닫히고 다음 주에 더 작은 덩이');
+  assert.equal(db.get('cuts/2026-11-23').est, 2);
+  assert.match(await p.locator('#cutStrip').innerText(), /다음 주 덩이 · 2장 첫 장면/);
+  assert.equal(await p.locator('.qr-wall li[data-stone="1"]').count(), 0, '못 넘긴 주는 돌이 아니다');
+  assert.equal(await p.evaluate(() => JSON.stringify(JOURNEY.week())), before, '한 주 판정은 그대로');
+}));
+
 (async () => {
   let failed = 0;
   browser = await chromium.launch({ args });

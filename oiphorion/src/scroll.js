@@ -45,6 +45,8 @@ function view(){
   if(level===1){
     h+='<section class="plan"><h4>계획표</h4><ol>'+((b.todoBy&&b.todoBy[state.line])||b.todo).map(t=>'<li>'+esc(t)+'</li>').join("")+
        (b.extra2&&state.line===2?'<li>'+esc(b.extra2)+'</li>':"")+'</ol></section>';
+    // 일요일 점검과 마감 준비에서는 채석장(이번 주 덩이)으로 바로 들어간다
+    if(b.id==="sunday"||(b.id==="closing"&&b.todo.some(t=>t.includes("덩이")))) h+='<div class="p-actions p-quarry"><span></span><button class="deeper" data-quarry-open="1">채석장 · 덩이 보기 <span aria-hidden="true">→</span></button></div>';
     const steps=stepsOf(b,state.line);
     const done=doneSet(b.id);
     if(steps.length) h+='<section class="plan steps"><h4>이렇게 한다'+(done.size?' · 오늘 '+done.size+'/'+steps.length:'')+'</h4><ol>'+steps.map((t,i)=>'<li'+(done.has(i)?' class="done"':'')+'>'+esc(t)+'</li>').join("")+'</ol></section>';

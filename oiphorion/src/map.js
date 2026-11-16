@@ -1376,6 +1376,7 @@ function showInfo(){
   det.hidden=!steps.length; stepsSummary(steps.length,done.size);
   det.querySelector("ol").innerHTML=steps.map((t,i)=>'<li'+(done.has(i)?' class="done"':'')+'><label><input type="checkbox" data-i="'+i+'"'+(done.has(i)?' checked':'')+'><span>'+esc(t)+'</span></label></li>').join("");
   DESK.sync();   // 이 칸의 조각(블록 쪼개기)
+  QUARRY.sync(); // 머리말의 덩이 띠
   const tm=trampMode(), breaks=isToday()&&JOURNEY.trampolineFor()==="breaks-today";
   const again=(b.id==="sunday"&&isToday()&&dayIdx===0)?" 산 정상 칸을 한 번 더 누르면 이번 주 점프를 본다.":" 같은 칸을 한 번 더 누르면 두루마리가 펼쳐진다.";
   const gone=" 트램펄린은 이번 주에 이미 잃어서 빈 등으로 걷는다.";
